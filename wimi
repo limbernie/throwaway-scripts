@@ -35,7 +35,7 @@ if grep -Ev '^[0-9]+$' <<<"$refresh" >/dev/null; then
   exit 1
 fi
 
-printf "\nWhat is my IP address? Ctrl-C to quit\n\n" "$refresh"
+printf "\nRefresh \`$PROG' every %ss. Ctrl-C to quit\n\n" "$refresh"
 
 printf "%6s  %-20s%-15s\n" "No." "Reference" "IP Address"
 printf "%6s  %-20s%-15s\n" "---" "---------" "----------"
