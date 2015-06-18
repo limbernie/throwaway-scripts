@@ -35,6 +35,17 @@ if grep -Ev '^[0-9]+$' <<<"$refresh" >/dev/null; then
   exit 1
 fi
 
+if [ $refresh -eq 0 ]; then
+  while true; do
+    read -p "Warning: refresh rate is 0s. Do you want to continue [Y/n]? " yn
+    case $yn in
+      [Yy]*) break;;
+      [Nn]*) exit 1;;
+          *) echo -e "Please answer [Y]es or [n]o\n";;
+    esac
+  done
+fi
+
 printf "\nRefresh \`$PROG' every %ss. Ctrl-C to quit\n\n" "$refresh"
 
 printf "%6s  %-20s%-15s\n" "No." "Reference" "IP Address"
