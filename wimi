@@ -1,6 +1,5 @@
 #!/bin/bash -
-# Print "what is my IP address?"
-# for every 60 seconds (default)
+# Print "what is my IP address?" every 60 seconds (default)
 
 PROG=$(basename $0)
 
@@ -36,7 +35,7 @@ if grep -Ev '^[0-9]+$' <<<"$refresh" >/dev/null; then
   exit 1
 fi
 
-printf "\n\`$PROG' renews every %ss. Ctrl-C to quit\n\n" "$refresh"
+printf "\nWhat is my IP address? Ctrl-C to quit\n\n" "$refresh"
 
 printf "%6s  %-20s%-15s\n" "No." "Reference" "IP Address"
 printf "%6s  %-20s%-15s\n" "---" "---------" "----------"
