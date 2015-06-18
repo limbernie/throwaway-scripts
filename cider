@@ -1,6 +1,6 @@
 #!/bin/bash -
-# Expand and print IPv4 address in CIDR notation
-# Version 1.0
+# Expand and print IPv4 address in CIDR notation to stdout
+# Version 2.0
 # Written by Bernard Lim <lim.yiok.kia@gmail.com>
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"

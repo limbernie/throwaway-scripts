@@ -3,7 +3,7 @@
 A collection of throwaway bash scripts I've written over time. Too wasteful to throw away.
 
 **Overview**
-- `cider: expand and print IP address in CIDR notation`
-- `crib: print a country's IP blocks`
-- `ipinfo: print extra information about IP address`
-- `wimi: print "what is my IP address?" every 60 seconds (default)`
+- `cider: Expand and print IPv4 address in CIDR notation to stdout`
+- `crib: Print a country's IP blocks in CIDR notation to stdout`
+- `ipinfo: Print extra information about IPv4 address to stdout`
+- `wimi: Print "what is my IP address?" every 60 seconds (default) to stdout`
