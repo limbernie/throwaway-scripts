@@ -1,5 +1,5 @@
 #!/bin/bash -
-# Print "what is my IP address?" every 60 seconds (default) to stdout
+# Print "what is my IP address?" every 60 seconds (default) to standard output
 
 PROG=$(basename $0)
 

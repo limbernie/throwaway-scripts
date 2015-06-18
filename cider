@@ -1,10 +1,10 @@
 #!/bin/bash -
-# Expand and print IPv4 address in CIDR notation to stdout
+# Expand and print IPv4 address in CIDR notation to standard output
 # Version 2.0
 # Written by Bernard Lim <lim.yiok.kia@gmail.com>
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
-VERSION="1.0"
+VERSION="2.0"
 PROG=$(basename $0)
 
 # to be or not to be?

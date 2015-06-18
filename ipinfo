@@ -1,5 +1,5 @@
 #!/bin/bash -
-# Print extra information about IPv4 address to stdout
+# Print extra information about IPv4 address to standard output
 # Version 3.0
 # Written by Bernard Lim <lim.yiok.kia@gmail.com>
 

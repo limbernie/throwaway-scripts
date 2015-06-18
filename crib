@@ -1,10 +1,10 @@
 #!/bin/bash -
-# Print a country's IP blocks in CIDR notation to stdout
+# Print a country's IP blocks in CIDR notation to standard output
 # Version 2.0
 # Written by Bernard Lim <bernard.lim@sands.com>
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
-VERSION="1.0"
+VERSION="2.0"
 PROG=$(basename $0)
 
 ASN_ONLY=false
