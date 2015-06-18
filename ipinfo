@@ -16,6 +16,7 @@ PROXY_OPTION=
 MAX_FIELDS=11
 
 # public DNS servers
+# slow, non-responsive DNS servers are commented out
 DNS_HOST="pcsupport.about.com"
 DNS_PATH="/od/tipstricks/a/free-public-dns-servers.htm"
 DNS_SOURCE="${HTTP}${DNS_HOST}${DNS_PATH}"
@@ -51,9 +52,9 @@ DNS_SERVERS=( \
 74.82.42.42 \
 109.69.8.51 )
 
-# dependency error
+# dependency error message
 depends() {
-  echo "$PROG: command \`$1' not found" >&2
+  echo "$PROG: dependency command \`$1' not found" >&2
   return 1
 }
 
@@ -144,7 +145,7 @@ proxify() {
 
 # proxify_type - return random proxy from xroxy.com
 # timeout in 5 seconds
-# 1atency < 1ms, reliability > 90%
+# type = Anonymous, 1atency < 1ms, reliability > 90%
 proxify_type() {
   PROXY_HOST="www.xroxy.com"
   PROXY_TYPE="Anonymous"
@@ -276,6 +277,7 @@ expand() {
     fi
 
     if (( $hi > $max )); then hi=$max; fi
+
     seq $lo $hi
 
   # -N
@@ -294,6 +296,7 @@ expand() {
     fi
 
     if (( $hi > $max )); then hi=$max; fi
+
     seq $hi
 
   # No man's land
@@ -320,7 +323,7 @@ dnslookup() {
   fi
 }
 
-# retrieve value of key from JSON
+# over-simplistic JSON parser
 retrieve() {
   local json=$1
   local key=$2
@@ -331,7 +334,7 @@ retrieve() {
 }
 
 # web scraper for GeoIP
-# timeout in 2 seconds and exit 1
+# timeout in 2 seconds and retry
 geoip() {
   local urls=( \
     freegeoip.net/json \
@@ -615,4 +618,3 @@ else
   stitch "$input" | cut -d"|" -f"$FIELD" 2>/dev/null | sed '/^$/d'
 
 fi
-
