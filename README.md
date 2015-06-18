@@ -6,5 +6,5 @@ A collection of throwaway bash scripts I've written over time. Too wasteful to t
 - `cider: expand and print IP address in CIDR notation`
 - `crib: print a country's IP blocks`
 - `ipinfo: print extra information about IP address`
-- `wimi: print "what is my IP address?" 
+- `wimi: print "what is my IP address?"`
 
