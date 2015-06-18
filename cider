@@ -7,22 +7,28 @@ AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
 VERSION="2.0"
 PROG=$(basename $0)
 
-# to be or not to be?
-EXPAND=
+# default action: print range
+ACTION="print_cidr"
 
 # fanciful output
 b="\033[1m"  # bold
 u="\033[4m"  # underline
 o="\033[0m"  # off
 
+# printf format string
+quad="%d.%d.%d.%d"
+range="%s - %s"
+
 # usage
 usage() {
 cat<<EOF
-Usage: $PROG [OPTION] [ADDRESS]
+Usage: $PROG [OPTION] [ADDRESS] [NUMBER]
 Expand and print ADDRESS in CIDR notation to standard output
 Example: $PROG 10.10.10.10/10
 
 $(echo -e ${b}Options${o})
+  -c1             Convert ADDRESS to NUMBER
+  -c2             Convert NUMBER to ADDRESS
   -e              Expand and print ADDRESS line by line
   -h              Display this help and exit
   -v              Print version information and exit
@@ -33,9 +39,9 @@ ADDRESS, i.e. starting and ending IP address as follows:
   a.b.c.d - w.x.y.z    where a, b, c, d, w, x, y and z
                        are integers from 0 to 255
 
-Note that using option \`-e' may take a longer time depending
-on the subnet mask because $PROG is printing every single IP
-address in the range.
+Note that using option \`-e' may take a longer time depending on
+the netmask because $PROG is printing every single IP address in
+the range.
 
 With no ADDRESS, or when ADDRESS is -, read standard input.
 
@@ -61,7 +67,7 @@ validate() {
   fi
 
   # is the IP address valid?
-  (IFS=./ read a b c d e <<<"$1"
+  IFS=./ read a b c d e <<<"$1"
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
     echo "$PROG: invalid IPv4 address"
     return 1
@@ -71,24 +77,37 @@ validate() {
   if (( $((10#$e)) > 32 )); then
     echo "$PROG: invalid CIDR notation"
     return 1
-  fi)
+  fi
 }
 
-# parse short options
-OPTIND=1
-while getopts ":ehv" opt; do
-  case $opt in
-    e) EXPAND=true;;
-    h) usage; exit 0;;
-    v)
-      echo "$PROG $VERSION"
-      echo "Written by $AUTHOR"
-      exit 0
-      ;;
-    \?) echo "$PROG: invalid option: -$OPTARG"; exit 1;;
-  esac
-done
-shift $((OPTIND-1))
+# convert network mask bits to number
+nmbits2nmask() {
+  let nmbits=$1
+  let nmask=0
+  for ((b=0; b<nmbits; b++)); do
+    nmask=$((nmask | 1 << (31 - b)))
+  done
+  echo $nmask
+}
+
+# convert number to quad-dotted notation
+num2quad() {
+  let num=$1
+  for ((o=0; o<4; o++)); do
+    a[$o]=$((num >> (8 * (3 - o)) & 0xff))
+  done
+  printf "$quad\n" ${a[0]} ${a[1]} ${a[2]} ${a[3]}
+}
+
+# convert quad-dotted notation to number
+quad2num() {
+  IFS=. read -a octet <<<"$1"
+  let num=0
+  for ((o=0; o<4; o++)); do
+    num=$((num | octet[o] << (8 * (3 - o))))
+  done
+  echo $num
+}
 
 # expand CIDR
 expand_cidr() {
@@ -103,103 +122,93 @@ expand_cidr() {
   let r=$((wc % 8))    # wildcard bits
 
   rr=$((2**r-1))
-  str="%d.%d.%d.%d"
-  range="%s - %s\n"
 
   case $o in
     0)
       o4=$((o4 & $((255-rr))))
-      if [ -z "$EXPAND" ]; then
-        start=$(printf "$str" $o1 $o2 $o3 $o4)
-        end=$(printf "$str" $o1 $o2 $o3 $((o4+rr)))
-        printf "$range" $start $end
-      else
-        for ((i=0; i<=$rr; i++)); do
-          printf "$str\n" $o1 $o2 $o3 $((o4+i))
-        done
-      fi
+      for ((i=0; i<=$rr; i++)); do
+        printf "$quad\n" $o1 $o2 $o3 $((o4+i))
+      done
       ;;
     1)
       o3=$((o3 & $((255-rr))))
       o4=0
-      if [ -z "$EXPAND" ]; then
-        start=$(printf "$str" $o1 $o2 $o3 $o4)
-        end=$(printf "$str" $o1 $o2 $((o3+rr)) 255)
-        printf "$range" $start $end
-      else
-        for ((i=0; i<=$rr; i++)); do
-          for ((j=0; j<=255; j++)); do
-            printf "$str\n" $o1 $o2 $((o3+i)) $((o4+j))
-          done
+      for ((i=0; i<=$rr; i++)); do
+        for ((j=0; j<=255; j++)); do
+          printf "$quad\n" $o1 $o2 $((o3+i)) $((o4+j))
         done
-      fi
+      done
       ;;
     2)
       o2=$((o2 & $((255-rr))))
       o3=0; o4=0
-      if [ -z "$EXPAND" ]; then
-        start=$(printf "$str" $o1 $o2 $o3 $o4)
-        end=$(printf "$str" $o1 $((o2+rr)) 255 255)
-        printf "$range" $start $end
-      else
-        for ((i=0; i<=$rr; i++)); do
-          for ((j=0; j<=255; j++)); do
-            for ((k=0; k<=255; k++)); do
-              printf "$str\n" $o1 $((o2+i)) $((o3+j)) $((o4+k))
-            done
+      for ((i=0; i<=$rr; i++)); do
+        for ((j=0; j<=255; j++)); do
+          for ((k=0; k<=255; k++)); do
+            printf "$quad\n" $o1 $((o2+i)) $((o3+j)) $((o4+k))
           done
         done
-      fi
+      done
       ;;
     3)
       o1=$((o1 & $((255-rr))))
       o2=0; o3=0; o4=0
-      if [ -z "$EXPAND" ]; then
-        start=$(printf "$str" $o1 $o2 $o3 $o4)
-        end=$(printf "$str" $((o1+rr)) 255 255 255)
-        printf "$range" $start $end
-      else
-        for ((i=0; i<=$rr; i++)); do
-          for ((j=0; j<=255; j++)); do
-            for ((k=0; k<=255; k++)); do
-              for ((l=0; l<=255; l++)); do
-                printf "$str\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
-              done
+      for ((i=0; i<=$rr; i++)); do
+        for ((j=0; j<=255; j++)); do
+          for ((k=0; k<=255; k++)); do
+            for ((l=0; l<=255; l++)); do
+              printf "$quad\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
             done
           done
         done
-      fi
+      done
       ;;
     4)
       o1=0; o2=0; o3=0; o4=0
-      if [ -z "$EXPAND" ]; then
-        start=$(printf "$str" $o1 $o2 $o3 $o4)
-        end=$(printf "$str" 255 255 255 255)
-        printf "$range" $start $end
-      else
-        for ((i=0; i<=255; i++)); do
-          for ((j=0; j<=255; j++)); do
-            for ((k=0; k<=255; k++)); do
-              for ((l=0; l<=255; l++)); do
-                printf "$str\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
-              done
+      for ((i=0; i<=255; i++)); do
+        for ((j=0; j<=255; j++)); do
+          for ((k=0; k<=255; k++)); do
+            for ((l=0; l<=255; l++)); do
+              printf "$quad\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
             done
           done
         done
-      fi
+      done
       ;;
   esac
 }
+
+# parse short options
+OPTIND=1
+while getopts ":c:ehv" opt; do
+  case $opt in
+    c)
+      case $OPTARG in
+        1) ACTION=quad2num;;
+        2) ACTION=num2quad;;
+        *) echo "$PROG: invalid option argument: $OPTARG" >&2; exit 1;;
+      esac
+      ;;
+    e) ACTION="expand_cidr";;
+    h) usage; exit 0;;
+    v)
+      echo "$PROG $VERSION"
+      echo "Written by $AUTHOR"
+      exit 0
+      ;;
+   \?) echo "$PROG: invalid option: -$OPTARG"; exit 1;;
+  esac
+done
+shift $((OPTIND-1))
 
 # main
 # read from stdin
 if [[ -z "$1" || "$1" == "-" ]]; then
   while read input; do
-    expand $input
+    $ACTION $input
   done
 # read from argument
 else
     input=$1
-    expand $input
+    $ACTION $input
 fi
-
