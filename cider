@@ -1,0 +1,205 @@
+#!/bin/bash -
+# Expand and print IPv4 address in CIDR notation
+# Version 1.0
+# Written by Bernard Lim <lim.yiok.kia@gmail.com>
+
+AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
+VERSION="1.0"
+PROG=$(basename $0)
+
+# to be or not to be?
+EXPAND=
+
+# fanciful output
+b="\033[1m"  # bold
+u="\033[4m"  # underline
+o="\033[0m"  # off
+
+# usage
+usage() {
+cat<<EOF
+Usage: $PROG [OPTION] [ADDRESS]
+Expand and print ADDRESS in CIDR notation to standard output
+Example: $PROG 10.10.10.10/10
+
+$(echo -e ${b}Options${o})
+  -e              Expand and print ADDRESS line by line
+  -h              Display this help and exit
+  -v              Print version information and exit
+
+Without any options, $PROG will only print the range of
+ADDRESS, i.e. starting and ending IP address as follows:
+
+  a.b.c.d - w.x.y.z    where a, b, c, d, w, x, y and z
+                       are integers from 0 to 255
+
+Note that using option \`-e' may take a longer time depending
+on the subnet mask because $PROG is printing every single IP
+address in the range.
+
+With no ADDRESS, or when ADDRESS is -, read standard input.
+
+Report $PROG bugs to $AUTHOR
+This software is distributed in the hope that it will be
+useful but without any warranty. It is provided "as is".
+EOF
+}
+
+# input validation
+validate() {
+  # sanity check
+  if [ -z "$1" ]; then
+    echo "$PROG: argument is missing: [ADDRESS]"
+    return 1
+  fi
+
+  # syntax check
+  local syntax="^([0-9]{1,3}\.){3}([0-9]{1,3})\/[0-9]{1,2}$"
+  if grep -Ev "$syntax" >/dev/null <<<"$1"; then
+    echo "$PROG: invalid IP address or CIDR notation"
+    return 1
+  fi
+
+  # is the IP address valid?
+  (IFS=./ read a b c d e <<<"$1"
+  if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
+    echo "$PROG: invalid IPv4 address"
+    return 1
+  fi
+
+  # is the CIDR notation valid?
+  if (( $((10#$e)) > 32 )); then
+    echo "$PROG: invalid CIDR notation"
+    return 1
+  fi)
+}
+
+# parse short options
+OPTIND=1
+while getopts ":ehv" opt; do
+  case $opt in
+    e) EXPAND=true;;
+    h) usage; exit 0;;
+    v)
+      echo "$PROG $VERSION"
+      echo "Written by $AUTHOR"
+      exit 0
+      ;;
+    \?) echo "$PROG: invalid option: -$OPTARG"; exit 1;;
+  esac
+done
+shift $((OPTIND-1))
+
+# expand CIDR
+expand_cidr() {
+  input=$1
+  validate $input; if [ $? -eq 1 ]; then return 1; fi
+
+  # tokenize input
+  IFS=./ read o1 o2 o3 o4 nm <<<"$input"
+
+  let wc=$((32 - nm))  # cisco wildcard
+  let o=$((wc / 8))    # no. of octets
+  let r=$((wc % 8))    # wildcard bits
+
+  rr=$((2**r-1))
+  str="%d.%d.%d.%d"
+  range="%s - %s\n"
+
+  case $o in
+    0)
+      o4=$((o4 & $((255-rr))))
+      if [ -z "$EXPAND" ]; then
+        start=$(printf "$str" $o1 $o2 $o3 $o4)
+        end=$(printf "$str" $o1 $o2 $o3 $((o4+rr)))
+        printf "$range" $start $end
+      else
+        for ((i=0; i<=$rr; i++)); do
+          printf "$str\n" $o1 $o2 $o3 $((o4+i))
+        done
+      fi
+      ;;
+    1)
+      o3=$((o3 & $((255-rr))))
+      o4=0
+      if [ -z "$EXPAND" ]; then
+        start=$(printf "$str" $o1 $o2 $o3 $o4)
+        end=$(printf "$str" $o1 $o2 $((o3+rr)) 255)
+        printf "$range" $start $end
+      else
+        for ((i=0; i<=$rr; i++)); do
+          for ((j=0; j<=255; j++)); do
+            printf "$str\n" $o1 $o2 $((o3+i)) $((o4+j))
+          done
+        done
+      fi
+      ;;
+    2)
+      o2=$((o2 & $((255-rr))))
+      o3=0; o4=0
+      if [ -z "$EXPAND" ]; then
+        start=$(printf "$str" $o1 $o2 $o3 $o4)
+        end=$(printf "$str" $o1 $((o2+rr)) 255 255)
+        printf "$range" $start $end
+      else
+        for ((i=0; i<=$rr; i++)); do
+          for ((j=0; j<=255; j++)); do
+            for ((k=0; k<=255; k++)); do
+              printf "$str\n" $o1 $((o2+i)) $((o3+j)) $((o4+k))
+            done
+          done
+        done
+      fi
+      ;;
+    3)
+      o1=$((o1 & $((255-rr))))
+      o2=0; o3=0; o4=0
+      if [ -z "$EXPAND" ]; then
+        start=$(printf "$str" $o1 $o2 $o3 $o4)
+        end=$(printf "$str" $((o1+rr)) 255 255 255)
+        printf "$range" $start $end
+      else
+        for ((i=0; i<=$rr; i++)); do
+          for ((j=0; j<=255; j++)); do
+            for ((k=0; k<=255; k++)); do
+              for ((l=0; l<=255; l++)); do
+                printf "$str\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
+              done
+            done
+          done
+        done
+      fi
+      ;;
+    4)
+      o1=0; o2=0; o3=0; o4=0
+      if [ -z "$EXPAND" ]; then
+        start=$(printf "$str" $o1 $o2 $o3 $o4)
+        end=$(printf "$str" 255 255 255 255)
+        printf "$range" $start $end
+      else
+        for ((i=0; i<=255; i++)); do
+          for ((j=0; j<=255; j++)); do
+            for ((k=0; k<=255; k++)); do
+              for ((l=0; l<=255; l++)); do
+                printf "$str\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
+              done
+            done
+          done
+        done
+      fi
+      ;;
+  esac
+}
+
+# main
+# read from stdin
+if [[ -z "$1" || "$1" == "-" ]]; then
+  while read input; do
+    expand $input
+  done
+# read from argument
+else
+    input=$1
+    expand $input
+fi
+

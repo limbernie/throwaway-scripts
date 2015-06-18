@@ -1,0 +1,46 @@
+#!/bin/bash -
+# Print "what is my IP address?"
+# for every 60 seconds (default)
+
+PROG=$(basename $0)
+
+urls=( \
+"ifconfig.no" \
+"ifconfig.co" \
+"icanhazip.com" \
+"orga.cat/ip" \
+"my.ip.fi" \
+"www.telize.com/ip" \
+"api.wipmania.com" \
+"ifconfig.me" \
+)
+
+goodbye() {
+  echo -e "  Goodbye!" >&2
+  exit 0
+}
+trap goodbye INT
+
+wip() {
+	while true; do
+    url=${urls[$RANDOM % ${#urls[@]}]}
+    if  curl -m5 -s $url && printf "%-20s" "$url" >&2; then
+      break
+    fi
+  done | sed 's/br/\n/' | tr -cd '[0-9].\n'
+}
+
+refresh=${1:-60}
+if grep -Ev '^[0-9]+$' <<<"$refresh" >/dev/null; then
+  echo "$PROG: invalid refresh rate" >&2
+  exit 1
+fi
+
+printf "\n\`$PROG' renews every %ss. Ctrl-C to quit\n\n" "$refresh"
+
+printf "%6s  %-20s%-15s\n" "No." "Reference" "IP Address"
+printf "%6s  %-20s%-15s\n" "---" "---------" "----------"
+
+while true; do
+  wip && sleep $refresh
+done 2>&1 | cat -n
