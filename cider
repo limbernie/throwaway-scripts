@@ -15,10 +15,6 @@ b="\033[1m"  # bold
 u="\033[4m"  # underline
 o="\033[0m"  # off
 
-# printf format string
-quad="%d.%d.%d.%d"
-range="%s - %s"
-
 # usage
 usage() {
 cat<<EOF
@@ -32,9 +28,10 @@ $(echo -e ${b}Options${o})
   -v              Print version information and exit
 
 Conversion TYPE can be:
-  1      IP address to number
-  2      number to IP address
-  3      netmask bits to netmask address
+  1    IP address to number
+  2    number to IP address
+  3    IP address to hexadecimal
+  4    netmask bits to netmask address
 
 Without any options, $PROG will only print the range of
 ADDRESS, i.e. starting and ending IP address as follows:
@@ -53,7 +50,8 @@ $(echo -e ${b}Examples${o})
   $PROG -e 10.10.10.10/10   # Expand and print all IP address in range
   $PROG -c1 10.10.10.10     # Convert IP address to number
   $PROG -c2 168430090       # Convert number to IP address
-  $PROG -c3 21              # Convert netmask bits to netmask address
+  $PROG -c3 10.10.10.10     # Convert IP address to hexadecimal
+  $PROG -c4 21              # Convert netmask bits to netmask address
 
 Report $PROG bugs to $AUTHOR
 This software is distributed in the hope that it will be
@@ -61,8 +59,8 @@ useful but without any warranty. It is provided "as is".
 EOF
 }
 
-# input validation
-validate() {
+# CIDR validation
+validate_cidr() {
   # sanity check
   if [ -z "$1" ]; then
     echo "$PROG: argument is missing: [ADDRESS]"
@@ -83,35 +81,128 @@ validate() {
     return 1
   fi
 
-  # is the CIDR notation valid?
+  # is the netmask valid?
   if (( $((10#$e)) > 32 )); then
-    echo "$PROG: invalid CIDR notation"
+    echo "$PROG: invalid netmask"
     return 1
   fi
 }
 
-# convert network mask bits to number
-nmbits2nmask() {
-  let nmbits=$1
+# IP address validation
+validate_ip() {
+  # sanity check
+  if [ -z "$1" ]; then
+    echo "$PROG: argument is missing: [ADDRESS]"
+    return 1
+  fi
+
+  # syntax check
+  local syntax="^([0-9]{1,3}\.){3}([0-9]{1,3})$"
+  if grep -Ev "$syntax" >/dev/null <<<"$1"; then
+    echo "$PROG: invalid IP address"
+    return 1
+  fi
+
+  # is the IP address valid?
+  IFS=. read a b c d <<<"$1"
+  if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
+    echo "$PROG: invalid IPv4 address"
+    return 1
+  fi
+}
+
+# netmask validation
+validate_nm() {
+  # sanity check
+  if [ -z "$1" ]; then
+    echo "$PROG: argument is missing: [NETMASK]"
+    return 1
+  fi
+
+  # syntax check
+  local syntax="^[0-9]{1,2}$"
+  if grep -Ev "$syntax" >/dev/null <<<"$1"; then
+    echo "$PROG: invalid netmask"
+    return 1
+  fi
+
+  # is the netmask valid?
+  if (( $((10#$1)) > 32 )); then
+    echo "$PROG: invalid netmask"
+    return 1
+  fi
+}
+
+# number validation
+validate_num() {
+  # sanity check
+  if [ -z "$1" ]; then
+    echo "$PROG: argument is missing: [ADDRESS]"
+    return 1
+  fi
+
+  # syntax check
+  local syntax="^[0-9]+$"
+  if grep -Ev "$syntax" >/dev/null <<<"$1"; then
+    echo "$PROG: invalid IPv4 address"
+    return 1
+  fi
+
+  # is the IP address valid?
+  if (( "$1" > 0xffffffff )); then
+    echo "$PROG: invalid IPv4 address"
+    return 1
+  fi
+}
+
+# convert netmask bits to number
+bit2num() {
+  input=$1
+  validate_nm $input; if [ $? -eq 1 ]; then return 1; fi
+
+  let bits=$input
   let nmask=0
-  for ((b=0; b<nmbits; b++)); do
+  for ((b=0; b<bits; b++)); do
     nmask=$((nmask | 1 << (31 - b)))
   done
   echo $nmask
 }
 
+# convert netmask bits to address
+bits2addr() {
+  input=$1
+  validate_nm $input; if [ $? -eq 1 ]; then return 1; fi
+
+  let bits=$input
+  echo $(num2quad $(bit2num $bits))
+}
+
 # convert number to quad-dotted notation
 num2quad() {
-  let num=$1
+  input=$1
+  validate_num $input; if [ $? -eq 1 ]; then return 1; fi
+
+  let num=$input
   for ((o=0; o<4; o++)); do
     a[$o]=$((num >> (8 * (3 - o)) & 0xff))
   done
-  printf "$quad\n" ${a[0]} ${a[1]} ${a[2]} ${a[3]}
+  printf "%d.%d.%d.%d\n" ${a[0]} ${a[1]} ${a[2]} ${a[3]}
+}
+
+# convert quad-dotted notation to hexadecimal
+quad2hex() {
+  input=$1
+  validate_ip $input; if [ $? -eq 1 ]; then return 1; fi
+
+  printf "%X\n" $(quad2num $input)
 }
 
 # convert quad-dotted notation to number
 quad2num() {
-  IFS=. read -a octet <<<"$1"
+  input=$1
+  validate_ip $input; if [ $? -eq 1 ]; then return 1; fi
+
+  IFS=. read -a octet <<<"$input"
   let num=0
   for ((o=0; o<4; o++)); do
     num=$((num | octet[o] << (8 * (3 - o))))
@@ -122,16 +213,17 @@ quad2num() {
 # expand CIDR
 expand_cidr() {
   input=$1
-  validate $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_cidr $input; if [ $? -eq 1 ]; then return 1; fi
 
   # tokenize input
   IFS=./ read o1 o2 o3 o4 nm <<<"$input"
 
-  let wc=$((32 - nm))  # cisco wildcard
+  let wc=$((32 - nm))  # cisco wildcard bits
   let o=$((wc / 8))    # no. of octets
-  let r=$((wc % 8))    # wildcard bits
+  let msb=$((wc % 8))  # most significant bits
 
-  rr=$((2**r-1))
+  rr=$((2**msb-1))
+  quad="%d.%d.%d.%d"
 
   case $o in
     0)
@@ -188,6 +280,21 @@ expand_cidr() {
   esac
 }
 
+# print CIDR range
+print_cidr() {
+  input=$1
+  validate_cidr $input; if [ $? -eq 1 ]; then return 1; fi
+
+  # tokenize input
+  IFS=./ read o1 o2 o3 o4 nm <<<"$input"
+
+  start=$(($(quad2num "$o1.$o2.$o3.$o4") & $(bit2num $nm)))
+  bcast=$((0xffffffff - $(bit2num $nm) + $start))
+
+  printf "%s - %s\n" $(num2quad $start) $(num2quad $bcast)
+}
+
+
 # parse short options
 OPTIND=1
 while getopts ":c:ehv" opt; do
@@ -196,6 +303,8 @@ while getopts ":c:ehv" opt; do
       case $OPTARG in
         1) ACTION=quad2num;;
         2) ACTION=num2quad;;
+        3) ACTION=quad2hex;;
+        4) ACTION=bits2addr;;
         *) echo "$PROG: invalid option argument: $OPTARG" >&2; exit 1;;
       esac
       ;;
