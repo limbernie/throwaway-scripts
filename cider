@@ -15,6 +15,18 @@ b="\033[1m"  # bold
 u="\033[4m"  # underline
 o="\033[0m"  # off
 
+# graceful death!
+die() {
+  echo "$PROG: $*" >&2
+  exit 1
+}
+
+# shorter usage
+short() {
+  usage | sed 2q
+  echo "See \`$PROG -h' for more information"
+}
+
 # usage
 usage() {
 cat<<EOF
@@ -22,16 +34,16 @@ Usage: $PROG [OPTION] [ADDRESS]
 Expand and print ADDRESS in CIDR notation to standard output
 
 $(echo -e ${b}Options${o})
-  -c TYPE         Quick conversion for TYPE
-  -e              Expand and print ADDRESS line by line
-  -h              Display this help and exit
-  -v              Print version information and exit
+  -c TYPE       Quick conversion for TYPE
+  -e            Expand and print ADDRESS line by line
+  -h            Display this help and exit
+  -v            Print version information and exit
 
 Conversion TYPE can be:
-  1    IP address to number
-  2    number to IP address
-  3    IP address to hexadecimal
-  4    netmask bits to netmask address
+  1   address to number
+  2   number to address
+  3   address to hexadecimal
+  4   netmask bits to address
 
 Without any options, $PROG will only print the range of
 ADDRESS, i.e. starting and ending IP address as follows:
@@ -42,8 +54,6 @@ ADDRESS, i.e. starting and ending IP address as follows:
 Note that using option \`-e' may take a longer time depending on
 the netmask because $PROG is printing every single IP address in
 the range.
-
-With no ADDRESS, or when ADDRESS is -, read standard input.
 
 $(echo -e ${b}Examples${o})
   $PROG 10.10.10.10/10      # Expand and print range
@@ -63,28 +73,24 @@ EOF
 validate_cidr() {
   # sanity check
   if [ -z "$1" ]; then
-    echo "$PROG: argument is missing: [ADDRESS]"
-    return 1
+    short; exit 1
   fi
 
   # syntax check
   local syntax="^([0-9]{1,3}\.){3}([0-9]{1,3})\/[0-9]{1,2}$"
   if grep -Ev "$syntax" >/dev/null <<<"$1"; then
-    echo "$PROG: invalid IP address or CIDR notation"
-    return 1
+    die "invalid IP address or CIDR notation"
   fi
 
   # is the IP address valid?
   IFS=./ read a b c d e <<<"$1"
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
-    echo "$PROG: invalid IPv4 address"
-    return 1
+    die "invalid IPv4 address"
   fi
 
   # is the netmask valid?
   if (( $((10#$e)) > 32 )); then
-    echo "$PROG: invalid netmask"
-    return 1
+    die "invalid netmask"
   fi
 }
 
@@ -92,22 +98,19 @@ validate_cidr() {
 validate_ip() {
   # sanity check
   if [ -z "$1" ]; then
-    echo "$PROG: argument is missing: [ADDRESS]"
-    return 1
+    short; exit 1
   fi
 
   # syntax check
   local syntax="^([0-9]{1,3}\.){3}([0-9]{1,3})$"
   if grep -Ev "$syntax" >/dev/null <<<"$1"; then
-    echo "$PROG: invalid IP address"
-    return 1
+    die "invalid IP address"
   fi
 
   # is the IP address valid?
   IFS=. read a b c d <<<"$1"
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
-    echo "$PROG: invalid IPv4 address"
-    return 1
+    die "invalid IPv4 address"
   fi
 }
 
@@ -115,21 +118,18 @@ validate_ip() {
 validate_nm() {
   # sanity check
   if [ -z "$1" ]; then
-    echo "$PROG: argument is missing: [NETMASK]"
-    return 1
+    short; exit 1
   fi
 
   # syntax check
   local syntax="^[0-9]{1,2}$"
   if grep -Ev "$syntax" >/dev/null <<<"$1"; then
-    echo "$PROG: invalid netmask"
-    return 1
+    die "invalid netmask"
   fi
 
   # is the netmask valid?
   if (( $((10#$1)) > 32 )); then
-    echo "$PROG: invalid netmask"
-    return 1
+    dike "invalid netmask"
   fi
 }
 
@@ -137,28 +137,25 @@ validate_nm() {
 validate_num() {
   # sanity check
   if [ -z "$1" ]; then
-    echo "$PROG: argument is missing: [ADDRESS]"
-    return 1
+    short; exit 1
   fi
 
   # syntax check
   local syntax="^[0-9]+$"
   if grep -Ev "$syntax" >/dev/null <<<"$1"; then
-    echo "$PROG: invalid IPv4 address"
-    return 1
+    die "invalid IPv4 address"
   fi
 
   # is the IP address valid?
   if (( "$1" > 0xffffffff )); then
-    echo "$PROG: invalid IPv4 address"
-    return 1
+    die "invalid IPv4 address"
   fi
 }
 
 # convert netmask bits to number
 bit2num() {
   input=$1
-  validate_nm $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_nm $input
 
   let bits=$input
   let nmask=0
@@ -169,18 +166,18 @@ bit2num() {
 }
 
 # convert netmask bits to address
-bits2addr() {
+bit2addr() {
   input=$1
-  validate_nm $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_nm $input
 
-  let bits=$input
-  echo $(num2quad $(bit2num $bits))
+  let bit=$input
+  echo $(num2quad $(bit2num $bit))
 }
 
 # convert number to quad-dotted notation
 num2quad() {
   input=$1
-  validate_num $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_num $input
 
   let num=$input
   for ((o=0; o<4; o++)); do
@@ -192,15 +189,15 @@ num2quad() {
 # convert quad-dotted notation to hexadecimal
 quad2hex() {
   input=$1
-  validate_ip $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_ip $input
 
-  printf "%X\n" $(quad2num $input)
+  printf "0x%X\n" $(quad2num $input)
 }
 
 # convert quad-dotted notation to number
 quad2num() {
   input=$1
-  validate_ip $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_ip $input
 
   IFS=. read -a octet <<<"$input"
   let num=0
@@ -213,38 +210,38 @@ quad2num() {
 # expand CIDR
 expand_cidr() {
   input=$1
-  validate_cidr $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_cidr $input
 
   # tokenize input
   IFS=./ read o1 o2 o3 o4 nm <<<"$input"
 
-  let wc=$((32 - nm))  # cisco wildcard bits
-  let o=$((wc / 8))    # no. of octets
+  let  wc=$((32 - nm)) # cisco wildcard bits
+  let   o=$((wc / 8))  # no. of octets
   let msb=$((wc % 8))  # most significant bits
 
-  rr=$((2**msb-1))
+  n=$((2**msb-1))
   quad="%d.%d.%d.%d"
 
   case $o in
     0)
-      o4=$((o4 & $((255-rr))))
-      for ((i=0; i<=$rr; i++)); do
+      o4=$((o4 & $((255-n))))
+      for ((i=0; i<=$n; i++)); do
         printf "$quad\n" $o1 $o2 $o3 $((o4+i))
       done
       ;;
     1)
-      o3=$((o3 & $((255-rr))))
+      o3=$((o3 & $((255-n))))
       o4=0
-      for ((i=0; i<=$rr; i++)); do
+      for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
           printf "$quad\n" $o1 $o2 $((o3+i)) $((o4+j))
         done
       done
       ;;
     2)
-      o2=$((o2 & $((255-rr))))
+      o2=$((o2 & $((255-n))))
       o3=0; o4=0
-      for ((i=0; i<=$rr; i++)); do
+      for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
           for ((k=0; k<=255; k++)); do
             printf "$quad\n" $o1 $((o2+i)) $((o3+j)) $((o4+k))
@@ -253,9 +250,9 @@ expand_cidr() {
       done
       ;;
     3)
-      o1=$((o1 & $((255-rr))))
+      o1=$((o1 & $((255-n))))
       o2=0; o3=0; o4=0
-      for ((i=0; i<=$rr; i++)); do
+      for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
           for ((k=0; k<=255; k++)); do
             for ((l=0; l<=255; l++)); do
@@ -283,15 +280,15 @@ expand_cidr() {
 # print CIDR range
 print_cidr() {
   input=$1
-  validate_cidr $input; if [ $? -eq 1 ]; then return 1; fi
+  validate_cidr $input
 
   # tokenize input
-  IFS=./ read o1 o2 o3 o4 nm <<<"$input"
+  IFS=/ read ip nm <<<"$input"
 
-  start=$(($(quad2num "$o1.$o2.$o3.$o4") & $(bit2num $nm)))
-  bcast=$((0xffffffff - $(bit2num $nm) + $start))
+  lo=$(($(quad2num $ip) & $(bit2num $nm)))
+  hi=$((0xffffffff - $(bit2num $nm) + $lo))
 
-  printf "%s - %s\n" $(num2quad $start) $(num2quad $bcast)
+  printf "%s - %s\n" $(num2quad $lo) $(num2quad $hi)
 }
 
 # parse short options
@@ -301,32 +298,29 @@ while getopts ":c:ehv" opt; do
   case $opt in
     c)
       if [ $# -gt 1 ]; then
-        echo "$PROG: only one -$opt should be specified" >&2
-        exit 1
+        die "option -$opt must be specified once"
       fi
 
       case $OPTARG in
         1) ACTION=quad2num;;
         2) ACTION=num2quad;;
         3) ACTION=quad2hex;;
-        4) ACTION=bits2addr;;
-        *) echo "$PROG: invalid option argument: $OPTARG" >&2; exit 1;;
+        4) ACTION=bit2addr;;
+        *) die "invalid option argument: $OPTARG";;
       esac
       ;;
     e)
       if [ $# -gt 1 ]; then
-        echo "$PROG: only one -$opt should be specified" >&2
-        exit 1
+        die "option -$opt must be specified once"
       fi
 
       ACTION=expand_cidr
       ;;
     h)
       if [ $# -eq 0 ]; then
-        usage
-        exit 0
+        usage; exit 0
       else
-        exit 1
+        die "option -$opt must be specified once"
       fi
       ;;
     v)
@@ -335,21 +329,13 @@ while getopts ":c:ehv" opt; do
         echo "Written by $AUTHOR"
         exit 0
       else
-        exit 1
+        die "option -$opt must be specified once"
       fi
       ;;
-   \?) echo "$PROG: invalid option: -$OPTARG"; exit 1;;
+   \?) die "invalid option: -$OPTARG";;
   esac
 done
 
 # main
-# read from stdin
-if [[ -z "$1" || "$1" == "-" ]]; then
-  while read input; do
-    $ACTION $input
-  done
-# read from argument
-else
-    input=$1
-    $ACTION $input
-fi
+input=$1
+$ACTION $input
