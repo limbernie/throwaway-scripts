@@ -8,7 +8,7 @@ VERSION="2.0"
 PROG=$(basename $0)
 
 # default action: print range
-ACTION="print_cidr"
+ACTION=print_cidr
 
 # fanciful output
 b="\033[1m"  # bold
@@ -294,12 +294,17 @@ print_cidr() {
   printf "%s - %s\n" $(num2quad $start) $(num2quad $bcast)
 }
 
-
 # parse short options
 OPTIND=1
 while getopts ":c:ehv" opt; do
+  shift $((OPTIND-1))
   case $opt in
     c)
+      if [ $# -gt 1 ]; then
+        echo "$PROG: only one -$opt should be specified" >&2
+        exit 1
+      fi
+
       case $OPTARG in
         1) ACTION=quad2num;;
         2) ACTION=num2quad;;
@@ -308,17 +313,34 @@ while getopts ":c:ehv" opt; do
         *) echo "$PROG: invalid option argument: $OPTARG" >&2; exit 1;;
       esac
       ;;
-    e) ACTION="expand_cidr";;
-    h) usage; exit 0;;
+    e)
+      if [ $# -gt 1 ]; then
+        echo "$PROG: only one -$opt should be specified" >&2
+        exit 1
+      fi
+
+      ACTION=expand_cidr
+      ;;
+    h)
+      if [ $# -eq 0 ]; then
+        usage
+        exit 0
+      else
+        exit 1
+      fi
+      ;;
     v)
-      echo "$PROG $VERSION"
-      echo "Written by $AUTHOR"
-      exit 0
+      if [ $# -eq 0 ]; then
+        echo "$PROG $VERSION"
+        echo "Written by $AUTHOR"
+        exit 0
+      else
+        exit 1
+      fi
       ;;
    \?) echo "$PROG: invalid option: -$OPTARG"; exit 1;;
   esac
 done
-shift $((OPTIND-1))
 
 # main
 # read from stdin
