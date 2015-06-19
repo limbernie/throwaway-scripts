@@ -22,16 +22,19 @@ range="%s - %s"
 # usage
 usage() {
 cat<<EOF
-Usage: $PROG [OPTION] [ADDRESS] [NUMBER]
+Usage: $PROG [OPTION] [ADDRESS]
 Expand and print ADDRESS in CIDR notation to standard output
-Example: $PROG 10.10.10.10/10
 
 $(echo -e ${b}Options${o})
-  -c1             Convert ADDRESS to NUMBER
-  -c2             Convert NUMBER to ADDRESS
+  -c TYPE         Quick conversion for TYPE
   -e              Expand and print ADDRESS line by line
   -h              Display this help and exit
   -v              Print version information and exit
+
+Conversion TYPE can be:
+  1      IP address to number
+  2      number to IP address
+  3      netmask bits to netmask address
 
 Without any options, $PROG will only print the range of
 ADDRESS, i.e. starting and ending IP address as follows:
@@ -44,6 +47,13 @@ the netmask because $PROG is printing every single IP address in
 the range.
 
 With no ADDRESS, or when ADDRESS is -, read standard input.
+
+$(echo -e ${b}Examples${o})
+  $PROG 10.10.10.10/10      # Expand and print range
+  $PROG -e 10.10.10.10/10   # Expand and print all IP address in range
+  $PROG -c1 10.10.10.10     # Convert IP address to number
+  $PROG -c2 168430090       # Convert number to IP address
+  $PROG -c3 21              # Convert netmask bits to netmask address
 
 Report $PROG bugs to $AUTHOR
 This software is distributed in the hope that it will be
