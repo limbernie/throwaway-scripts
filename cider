@@ -4,7 +4,7 @@
 # Written by Bernard Lim <lim.yiok.kia@gmail.com>
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
-VERSION="2.0"
+VERSION="3.0"
 PROG=$(basename $0)
 
 # default action: print range
@@ -30,7 +30,7 @@ short() {
 # usage
 usage() {
 cat<<EOF
-Usage: $PROG [OPTION] [ADDRESS]
+Usage: $PROG [OPTION] [ADDRESS]...
 Expand and print ADDRESS in CIDR notation to standard output
 
 $(echo -e ${b}Options${o})
@@ -54,6 +54,8 @@ ADDRESS, i.e. starting and ending IP address as follows:
 Note that using option \`-e' may take a longer time depending on
 the netmask because $PROG is printing every single IP address in
 the range.
+
+When ADDRESS is -, read standard input.
 
 $(echo -e ${b}Examples${o})
   $PROG 10.10.10.10/10      # Expand and print range
@@ -83,7 +85,8 @@ validate_cidr() {
   fi
 
   # is the IP address valid?
-  IFS=./ read a b c d e <<<"$1"
+  OLD_IFS=$IFS
+  IFS=./ read a b c d e <<<"$1"; IFS=$OLD_IFS
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
     die "invalid IPv4 address"
   fi
@@ -108,7 +111,8 @@ validate_ip() {
   fi
 
   # is the IP address valid?
-  IFS=. read a b c d <<<"$1"
+  OLD_IFS=$IFS
+  IFS=. read a b c d <<<"$1"; IFS=$OLD_IFS
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
     die "invalid IPv4 address"
   fi
@@ -199,7 +203,8 @@ quad2num() {
   input=$1
   validate_ip $input
 
-  IFS=. read -a octet <<<"$input"
+  OLD_IFS=$IFS
+  IFS=. read -a octet <<<"$input"; IFS=$OLD_IFS
   let num=0
   for ((o=0; o<4; o++)); do
     num=$((num | octet[o] << (8 * (3 - o))))
@@ -213,7 +218,8 @@ expand_cidr() {
   validate_cidr $input
 
   # tokenize input
-  IFS=./ read o1 o2 o3 o4 nm <<<"$input"
+  OLD_IFS=$IFS
+  IFS=./ read o1 o2 o3 o4 nm <<<"$input"; IFS=$OLD_IFS
 
   let  wc=$((32 - nm)) # cisco wildcard bits
   let   o=$((wc / 8))  # no. of octets
@@ -283,7 +289,8 @@ print_cidr() {
   validate_cidr $input
 
   # tokenize input
-  IFS=/ read ip nm <<<"$input"
+  OLD_IFS=$IFS
+  IFS=/ read ip nm <<<"$input"; IFS=$OLD_IFS
 
   lo=$(($(quad2num $ip) & $(bit2num $nm)))
   hi=$((0xffffffff - $(bit2num $nm) + $lo))
@@ -297,10 +304,6 @@ while getopts ":c:ehv" opt; do
   shift $((OPTIND-1))
   case $opt in
     c)
-      if [ $# -gt 1 ]; then
-        die "option -$opt must be specified once"
-      fi
-
       case $OPTARG in
         1) ACTION=quad2num;;
         2) ACTION=num2quad;;
@@ -310,17 +313,13 @@ while getopts ":c:ehv" opt; do
       esac
       ;;
     e)
-      if [ $# -gt 1 ]; then
-        die "option -$opt must be specified once"
-      fi
-
       ACTION=expand_cidr
       ;;
     h)
       if [ $# -eq 0 ]; then
         usage; exit 0
       else
-        die "option -$opt must be specified once"
+        short; exit 1
       fi
       ;;
     v)
@@ -329,7 +328,7 @@ while getopts ":c:ehv" opt; do
         echo "Written by $AUTHOR"
         exit 0
       else
-        die "option -$opt must be specified once"
+        short; exit 1
       fi
       ;;
    \?) die "invalid option: -$OPTARG";;
@@ -337,5 +336,21 @@ while getopts ":c:ehv" opt; do
 done
 
 # main
-input=$1
-$ACTION $input
+# empty arguments
+if [ $# -eq 0 ]; then short; exit 1; fi
+
+if [[ "$1" == "-" ]]; then
+  # read from stdin
+  shift 1
+  while read input; do
+    (read -a arr <<<"$input"
+    for i in "${arr[@]}"; do
+      $ACTION $i
+    done)
+  done
+else
+  # everything else
+  for input in $@; do
+    $ACTION $input
+  done
+fi
