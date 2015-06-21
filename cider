@@ -43,7 +43,9 @@ Conversion TYPE can be:
   1   address to number
   2   number to address
   3   address to hexadecimal
-  4   netmask bits to address
+  4   hexadecimal to address
+  5   netmask bits to address
+  6   netmask address to bits
 
 Without any options, $PROG will only print the range of
 ADDRESS, i.e. starting and ending IP address as follows:
@@ -85,8 +87,8 @@ validate_cidr() {
   fi
 
   # is the IP address valid?
-  OLD_IFS=$IFS
-  IFS=./ read a b c d e <<<"$1"; IFS=$OLD_IFS
+  OLD_IFS="$IFS"
+  IFS=./ read -r a b c d e <<<"$1"; IFS="$OLD_IFS"
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
     die "invalid IPv4 address"
   fi
@@ -111,8 +113,8 @@ validate_ip() {
   fi
 
   # is the IP address valid?
-  OLD_IFS=$IFS
-  IFS=. read a b c d <<<"$1"; IFS=$OLD_IFS
+  OLD_IFS="$IFS"
+  IFS=. read -r a b c d <<<"$1"; IFS="$OLD_IFS"
   if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
     die "invalid IPv4 address"
   fi
@@ -203,8 +205,8 @@ quad2num() {
   input=$1
   validate_ip $input
 
-  OLD_IFS=$IFS
-  IFS=. read -a octet <<<"$input"; IFS=$OLD_IFS
+  OLD_IFS="$IFS"
+  IFS=. read -a octet <<<"$input"; IFS="$OLD_IFS"
   let num=0
   for ((o=0; o<4; o++)); do
     num=$((num | octet[o] << (8 * (3 - o))))
@@ -218,8 +220,8 @@ expand_cidr() {
   validate_cidr $input
 
   # tokenize input
-  OLD_IFS=$IFS
-  IFS=./ read o1 o2 o3 o4 nm <<<"$input"; IFS=$OLD_IFS
+  OLD_IFS="$IFS"
+  IFS=./ read -r o1 o2 o3 o4 nm <<<"$input"; IFS="$OLD_IFS"
 
   let  wc=$((32 - nm)) # cisco wildcard bits
   let   o=$((wc / 8))  # no. of octets
@@ -289,8 +291,8 @@ print_cidr() {
   validate_cidr $input
 
   # tokenize input
-  OLD_IFS=$IFS
-  IFS=/ read ip nm <<<"$input"; IFS=$OLD_IFS
+  OLD_IFS="$IFS"
+  IFS=/ read -r ip nm <<<"$input"; IFS="$OLD_IFS"
 
   lo=$(($(quad2num $ip) & $(bit2num $nm)))
   hi=$((0xffffffff - $(bit2num $nm) + $lo))
@@ -308,7 +310,9 @@ while getopts ":c:ehv" opt; do
         1) ACTION=quad2num;;
         2) ACTION=num2quad;;
         3) ACTION=quad2hex;;
-        4) ACTION=bit2addr;;
+        4) ACTION=hex2quad;;
+        5) ACTION=bit2addr;;
+        6) ACTION=addr2bit;;
         *) die "invalid option argument: $OPTARG";;
       esac
       ;;
@@ -342,11 +346,12 @@ if [ $# -eq 0 ]; then short; exit 1; fi
 if [[ "$1" == "-" ]]; then
   # read from stdin
   shift 1
-  while read input; do
-    (read -a arr <<<"$input"
+  # crazy fast; cat | sipcalc - | grep -i 'network range' | cut -c18-
+  while read -r input; do
+    read -a arr <<<"$input"
     for i in "${arr[@]}"; do
       $ACTION $i
-    done)
+    done
   done
 else
   # everything else
