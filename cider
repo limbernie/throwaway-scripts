@@ -287,6 +287,38 @@ expand_cidr() {
 
 # print CIDR range
 print_cidr() {
+  awk -F"/" '
+    function bit2num(bits)
+    {
+      num = 0;
+      for (b = 0; b < bits; b++)
+        num = or(num, lshift(1, (31 - b)));
+      return num
+    }
+    function num2quad(num)
+    {
+      for (o = 0; o < 4; o++)
+        a[o] = and(rshift(num, 8 * (3 - o)), 0xff)
+      printf "%d.%d.%d.%d", a[0], a[1], a[2], a[3]
+    }
+    function quad2num(quad)
+    {
+      split(quad, octets, ".")
+      num = 0;
+      for (o = 0; o < 4; o++)
+        num = or(num, lshift(octets[o+1], 8 * (3 - o)));
+      return num
+    }
+    {
+      ip = $1; nm = $2
+      lo = and(quad2num(ip), bit2num(nm))
+      hi = 0xffffffff - bit2num(nm) + lo
+      printf "%s -- %s\n", num2quad(lo), num2quad(hi)
+    }' $1
+}
+
+# print CIDR range
+print_cidr_old() {
   input=$1
   validate_cidr $input
 
@@ -297,7 +329,7 @@ print_cidr() {
   lo=$(($(quad2num $ip) & $(bit2num $nm)))
   hi=$((0xffffffff - $(bit2num $nm) + $lo))
 
-  printf "%s - %s\n" $(num2quad $lo) $(num2quad $hi)
+  printf "%s - %s" $(num2quad $lo) $(num2quad $hi)
 }
 
 # parse short options
@@ -344,15 +376,16 @@ done
 if [ $# -eq 0 ]; then short; exit 1; fi
 
 if [[ "$1" == "-" ]]; then
+  $ACTION -
   # read from stdin
-  shift 1
+  #shift 1
   # crazy fast; cat | sipcalc - | grep -i 'network range' | cut -c18-
-  while read -r input; do
-    read -a arr <<<"$input"
-    for i in "${arr[@]}"; do
-      $ACTION $i
-    done
-  done
+  #while read -r input; do
+  #  read -a arr <<<"$input"
+  #  for i in "${arr[@]}"; do
+  #    $ACTION $i
+  #  done
+  #done
 else
   # everything else
   for input in $@; do
