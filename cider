@@ -206,7 +206,7 @@ while getopts ":c:ehv" opt; do
   shift $((OPTIND-1))
   case $opt in
     c)
-      if [ $# -eq 1 ]; then
+      if [ $# -ge 1 ]; then
         case $OPTARG in
           1) ACTION=quad2num;;
           2) ACTION=num2quad;;
