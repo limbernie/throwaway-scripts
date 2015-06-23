@@ -1,6 +1,6 @@
 #!/bin/bash -
 # Expand and print IPv4 address in CIDR notation to standard output
-# Version 2.0
+# Version 3.0
 # Written by Bernard Lim <lim.yiok.kia@gmail.com>
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
@@ -57,7 +57,8 @@ Note that using option \`-e' may take a longer time depending on
 the netmask because $PROG is printing every single IP address in
 the range.
 
-When ADDRESS is -, read standard input.
+When ADDRESS is -, read standard input. This is useful if you $(echo -ne ${b}cat${o})(1)
+a list of addresses to $PROG for fast expansion.
 
 $(echo -e ${b}Examples${o})
   $PROG 10.10.10.10/10      # Expand and print range
@@ -72,6 +73,12 @@ This software is distributed in the hope that it will be
 useful but without any warranty. It is provided "as is".
 EOF
 }
+
+###############################################################################
+#                                                                             #
+#                          INPUT VALIDATION (BASH)                            #
+#                                                                             #
+###############################################################################
 
 # CIDR validation
 validate_cidr() {
@@ -158,8 +165,14 @@ validate_num() {
   fi
 }
 
+###############################################################################
+#                                                                             #
+#                            CONVERSIONS (BASH)                               #
+#                                                                             #
+###############################################################################
+
 # convert netmask bits to number
-bit2num() {
+bit2num_() {
   input=$1
   validate_nm $input
 
@@ -172,16 +185,16 @@ bit2num() {
 }
 
 # convert netmask bits to address
-bit2addr() {
+bit2addr_() {
   input=$1
   validate_nm $input
 
   let bit=$input
-  echo $(num2quad $(bit2num $bit))
+  echo $(num2quad_ $(bit2num_ $bit))
 }
 
 # convert number to quad-dotted notation
-num2quad() {
+num2quad_() {
   input=$1
   validate_num $input
 
@@ -193,15 +206,15 @@ num2quad() {
 }
 
 # convert quad-dotted notation to hexadecimal
-quad2hex() {
+quad2hex_() {
   input=$1
   validate_ip $input
 
-  printf "0x%X\n" $(quad2num $input)
+  printf "0x%X\n" $(quad2num_ $input)
 }
 
 # convert quad-dotted notation to number
-quad2num() {
+quad2num_() {
   input=$1
   validate_ip $input
 
@@ -214,12 +227,18 @@ quad2num() {
   echo $num
 }
 
-# expand CIDR
-expand_cidr() {
+###############################################################################
+#                                                                             #
+#                          EXPAND RANGE (BASH)                                #
+#                                                                             #
+###############################################################################
+
+# expand CIDR range
+expand_cidr_() {
   input=$1
   validate_cidr $input
 
-  # tokenize input
+  # split input
   OLD_IFS="$IFS"
   IFS=./ read -r o1 o2 o3 o4 nm <<<"$input"; IFS="$OLD_IFS"
 
@@ -239,44 +258,40 @@ expand_cidr() {
       ;;
     1)
       o3=$((o3 & $((255-n))))
-      o4=0
       for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
-          printf "$quad\n" $o1 $o2 $((o3+i)) $((o4+j))
+          printf "$quad\n" $o1 $o2 $((o3+i)) $j
         done
       done
       ;;
     2)
       o2=$((o2 & $((255-n))))
-      o3=0; o4=0
       for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
           for ((k=0; k<=255; k++)); do
-            printf "$quad\n" $o1 $((o2+i)) $((o3+j)) $((o4+k))
+            printf "$quad\n" $o1 $((o2+i)) $j $k
           done
         done
       done
       ;;
     3)
       o1=$((o1 & $((255-n))))
-      o2=0; o3=0; o4=0
       for ((i=0; i<=$n; i++)); do
         for ((j=0; j<=255; j++)); do
           for ((k=0; k<=255; k++)); do
             for ((l=0; l<=255; l++)); do
-              printf "$quad\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
+              printf "$quad\n" $((o1+i)) $j $k $l
             done
           done
         done
       done
       ;;
     4)
-      o1=0; o2=0; o3=0; o4=0
       for ((i=0; i<=255; i++)); do
         for ((j=0; j<=255; j++)); do
           for ((k=0; k<=255; k++)); do
             for ((l=0; l<=255; l++)); do
-              printf "$quad\n" $((o1+i)) $((o2+j)) $((o3+k)) $((o4+l))
+              printf "$quad\n" $i $j $k $l
             done
           done
         done
@@ -285,9 +300,63 @@ expand_cidr() {
   esac
 }
 
+###############################################################################
+#                                                                             #
+#                           PRINT RANGE (BASH)                                #
+#                                                                             #
+###############################################################################
+
+# print CIDR range
+print_cidr_() {
+  input=$1
+  validate_cidr $input
+
+  # split input
+  OLD_IFS="$IFS"
+  IFS=/ read -r ip nm <<<"$1"; IFS="$OLD_IFS"
+
+  lo=$(($(quad2num_ $ip) & $(bit2num_ $nm)))
+  hi=$((0xffffffff - $(bit2num_ $nm) + $lo))
+
+  printf "%s - %s\n" $(num2quad_ $lo) $(num2quad_ $hi)
+}
+
+###############################################################################
+#                                                                             #
+#                               ACTIONS                                       #
+#                                                                             #
+###############################################################################
+
+# quad2num() {}
+# num2quad() {}
+# quad2hex() {}
+# hex2quad() {}
+# bit2addr() {}
+# addr2bit() {}
+
+# expand CIDR range
+expand_cidr() {
+  expand_cidr_ $1
+}
+
 # print CIDR range
 print_cidr() {
-  awk -F"/" '
+  if [[ "$1" == "-" ]]; then
+    _awk "print_cidr" -
+  else
+    bash_ "print_cidr" $1
+  fi
+}
+
+###############################################################################
+#                                                                             #
+#                           FUNCTION CHOOSER                                  #
+#                                                                             #
+###############################################################################
+
+# functions in awk (fast)
+_awk() {
+  awk -F"[./]" -v "prog=$PROG" -v "f=$1" '
     function bit2num(bits)
     {
       num = 0;
@@ -299,7 +368,7 @@ print_cidr() {
     {
       for (o = 0; o < 4; o++)
         a[o] = and(rshift(num, 8 * (3 - o)), 0xff)
-      printf "%d.%d.%d.%d", a[0], a[1], a[2], a[3]
+      return a[0]"."a[1]"."a[2]"."a[3]
     }
     function quad2num(quad)
     {
@@ -309,27 +378,37 @@ print_cidr() {
         num = or(num, lshift(octets[o+1], 8 * (3 - o)));
       return num
     }
+    function die(err)
     {
-      ip = $1; nm = $2
+      print prog ": " err > "/dev/stderr"
+    }
+    function print_cidr()
+    {
+      if ($1 < 0 || $1 > 255) { die("invalid IPv4 address"); next }
+      if ($2 < 0 || $2 > 255) { die("invalid IPv4 address"); next }
+      if ($3 < 0 || $3 > 255) { die("invalid IPv4 address"); next }
+      if ($4 < 0 || $4 > 255) { die("invalid IPv4 address"); next }
+      if ($5 < 0 || $5 > 32) { die("invalid netmask"); next }
+      ip = $1"."$2"."$3"."$4; nm = $5
       lo = and(quad2num(ip), bit2num(nm))
       hi = 0xffffffff - bit2num(nm) + lo
-      printf "%s -- %s\n", num2quad(lo), num2quad(hi)
-    }' $1
+      printf "%s - %s\n", num2quad(lo), num2quad(hi)
+    }
+    /* function chooser */
+    {
+      switch (f) {
+        case "print_cidr": print_cidr(); break
+        default: die("unknown function"); exit 1; break
+      }
+    }' $2
 }
 
-# print CIDR range
-print_cidr_old() {
-  input=$1
-  validate_cidr $input
-
-  # tokenize input
-  OLD_IFS="$IFS"
-  IFS=/ read -r ip nm <<<"$input"; IFS="$OLD_IFS"
-
-  lo=$(($(quad2num $ip) & $(bit2num $nm)))
-  hi=$((0xffffffff - $(bit2num $nm) + $lo))
-
-  printf "%s - %s" $(num2quad $lo) $(num2quad $hi)
+# functions in bash (normal)
+bash_() {
+  case $1 in
+    "print_cidr") print_cidr_ $2;;
+               *) die "unknown function";;
+  esac
 }
 
 # parse short options
@@ -339,12 +418,12 @@ while getopts ":c:ehv" opt; do
   case $opt in
     c)
       case $OPTARG in
-        1) ACTION=quad2num;;
-        2) ACTION=num2quad;;
-        3) ACTION=quad2hex;;
-        4) ACTION=hex2quad;;
-        5) ACTION=bit2addr;;
-        6) ACTION=addr2bit;;
+        1) ACTION=quad2num_;;
+        2) ACTION=num2quad_;;
+        3) ACTION=quad2hex_;;
+        4) ACTION=hex2quad_;;
+        5) ACTION=bit2addr_;;
+        6) ACTION=addr2bit_;;
         *) die "invalid option argument: $OPTARG";;
       esac
       ;;
@@ -372,22 +451,15 @@ while getopts ":c:ehv" opt; do
 done
 
 # main
-# empty arguments
-if [ $# -eq 0 ]; then short; exit 1; fi
-
-if [[ "$1" == "-" ]]; then
-  $ACTION -
+if [ $# -eq 0 ]; then
+  # empty arguments
+  short
+  exit 1
+elif [[ "$1" == "-" ]]; then
   # read from stdin
-  #shift 1
-  # crazy fast; cat | sipcalc - | grep -i 'network range' | cut -c18-
-  #while read -r input; do
-  #  read -a arr <<<"$input"
-  #  for i in "${arr[@]}"; do
-  #    $ACTION $i
-  #  done
-  #done
+  $ACTION -
 else
-  # everything else
+  # multiple arguments
   for input in $@; do
     $ACTION $input
   done
