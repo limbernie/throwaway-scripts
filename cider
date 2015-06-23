@@ -225,7 +225,7 @@ while getopts ":c:ehv" opt; do
       fi
       ;;
     e)
-      if [ $# -eq 1 ]; then
+      if [ $# -ge 1 ]; then
         ACTION=expand_cidr
       else
         short
