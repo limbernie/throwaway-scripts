@@ -53,9 +53,9 @@ ADDRESS, i.e. starting and ending IP address as follows:
   a.b.c.d - w.x.y.z    where a, b, c, d, w, x, y and z
                        are integers from 0 to 255
 
-Note that using option \`-e' for subnet bigger then /16
-may take a longer time depending on the netmask because
-$PROG is printing every single IP address in the range.
+Note that using option \`-e' for subnet bigger then /16 may
+take a longer time because $PROG is printing every single IP
+address in the range.
 
 When ADDRESS is -, read standard input. This can be useful
 if you $(echo -ne ${b}cat${o})(1) a list of addresses to $PROG for fast expansion.
@@ -66,7 +66,7 @@ $(echo -e ${b}Examples${o})
   $PROG -c1 10.10.10.10     # Convert IP address to number
   $PROG -c2 168430090       # Convert number to IP address
   $PROG -c3 10.10.10.10     # Convert IP address to hexadecimal
-  $PROG -c4 0A0A0A0A        # Convert hexadecimal to IP address
+  $PROG -c4 0xDEADBEEF      # Convert hexadecimal to IP address
   $PROG -c5 25              # Convert netmask bits to address
   $PROG -c6 255.255.240.0   # Convert netmask address to bits
 
@@ -127,12 +127,15 @@ _awk() {
     function quad2hex(quad)
     {
       validate_ip(quad)
-      printf "%X", quad2num(quad)
+      printf "0x%X", quad2num(quad)
     }
     function hex2quad(hex)
     {
       validate_hex(hex)
-      return num2quad(strtonum("0x"hex))
+      if (hex !~ /^0[xX]/)
+        return num2quad(strtonum("0x"hex))
+      else
+        return num2quad(strtonum(hex))
     }
     function expand_cidr()
     {
@@ -185,7 +188,7 @@ _awk() {
     }
     function validate_hex(hex)
     {
-      if (length(hex) > 8 || hex !~ /[a-fA-F0-9]+/) die("invalid IPv4 address")
+      if (length(hex) > 10 || hex !~ /^(0[xX])?[a-fA-F0-9]+$/) die("invalid IPv4 address")
     }
     /* function chooser */
     {
