@@ -7,22 +7,38 @@ AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
 VERSION="2.0"
 PROG=$(basename $0)
 
-ASN_ONLY=false
-PARALLEL="xargs -n1 -P${MAX:=64} -I{}"  # if GNU parallel not available
+# default: CC to IP blocks
+ACTION=cc2ip
+
+# if GNU parallel is not installed
+PARALLEL="xargs -n1 -P${MAX:=64} -I{}"
 
 # fanciful output
 b="\033[1m"  # bold
 u="\033[4m"  # underline
 o="\033[0m"  # off
 
+# graceful death!
+die() {
+  echo "$PROG: $*" >&2
+  exit 1
+}
+
+# shorter usage
+short() {
+  usage | sed 2q
+  echo "See \`$PROG -h' for more information"
+}
+
 # usage
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION] [CC] (2-letter country code)
+Usage: $PROG [OPTION] [CC]... (2-letter country code)
 Print CC's IP blocks in CIDR notation to standard output
 
 $(echo -e ${b}Options${o})
   -a            Print ASN's IP blocks and exit
+  -c            Print CC's ASNs and exit
   -h            Display this help and exit
   -p n          Run n processes in parallel (default n=64)
   -v            Show version information and exit
@@ -37,6 +53,7 @@ $(echo -e ${b}Examples${o})
   $PROG US          # Print United States' IP blocks (long)
   $PROG -p 100 SG   # Same as above but run 100 processes in parallel
   $PROG -a AS668    # Print IP blocks originating from AS668
+  $PROG -c SG       # Print ASNs originating from SG
 
 Report $PROG bugs to $AUTHOR
 This software is distributed in the hope that it will be
@@ -46,30 +63,42 @@ EOF
 
 # return IP prefixes from ASN
 asn2ip() {
-  local asn=$1
+  local asn=$1; validate_asn $asn
   local command=!g
   local server=whois.radb.net
 
   if [[ -z "$asn" || "$asn" == "-" ]]; then
-    (cat | $PARALLEL whois -h $server "$command{}" 2>/dev/null | \
-      grep -Ev '^[a-zA-Z]' | tr -d '\n' | sed -r 's/(\/[0-9]{1,2})/\1\n/g' | \
-        sed '/^$/d' | tr -d ' ') | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
-          uniq -c | awk '{ print $NF }'
+    cat $asn
   else
-    (whois -h $server "$command$asn" 2>/dev/null) | \
+    cat <<<"$asn"
+  fi | $PARALLEL whois -h $server "$command{}" 2>/dev/null | \
       grep -Ev '^[a-zA-Z]' | tr -d '\n' | sed -r 's/(\/[0-9]{1,2})/\1\n/g' | \
         sed '/^$/d' | tr -d ' ' | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
           uniq -c | awk '{ print $NF }'
-  fi
 }
 
 # return ASN from CC
 cc2asn() {
-  local cc=$(tr 'a-z' 'A-Z' <<<$1)
+  local cc=$(tr 'a-z' 'A-Z' <<<$1); validate_cc $cc
   local ua="Mozilla/5.0"
   local url="http://bgp.he.net/country/$cc"
 
-  curl -s -A $ua $url | grep -Eo 'AS[0-9]+' | uniq -c | awk '{ print $NF }'
+  if [[ -z "$cc" || "$cc" == "-" ]]; then
+    cat $asn
+  else
+    cat <<<"$asn"
+  fi | curl -s -A $ua $url | grep -Eo 'AS[0-9]+' | uniq -c | awk '{ print $NF }'
+}
+
+# return IP from CC
+cc2ip() {
+  local cc=$1; validate_cc $cc
+
+  if [[ -z "$cc" || "$cc" == "-" ]]; then
+    cc2asn $cc | asn2ip
+  else
+    cc2asn <<<"$cc" | asn2ip
+  fi
 }
 
 # validate ASN
@@ -78,14 +107,12 @@ validate_asn() {
 
   # sanity check
   if [ -z "$asn" ]; then
-    echo "$PROG: argument is missing: [ASN]" >&2
-    return 1
+    die "argument is missing: [ASN]"
   fi
 
   # format check
-  if grep -Ev '^[aA][sS][0-9]+$' <<<"$asn" > /dev/null; then
-    echo "$PROG: invalid ASN format" >&2
-    return 1
+  if grep -Ev '^(-|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
+    die "invalid ASN format"
   fi
 }
 
@@ -95,69 +122,86 @@ validate_cc() {
 
   # sanity check
   if [ -z "$cc" ]; then
-    echo "$PROG: argument is missing: [CC]" >&2
-    return 1
+    die "argument is missing: [CC]"
   fi
 
   # format check
   if grep -Ev '^[a-zA-Z]{2}$' <<<"$cc" >/dev/null; then
-    echo "$PROG: invalid country code" >&2
-    return 1
+    die "invalid country code"
   fi
 }
 
 # Check for empty arguments
 if [ $# -eq 0 ]; then
-  usage
+  short
   exit 1
 fi
 
 # Parse short options
 OPTIND=1
-while getopts ":ahp:v" opt; do
+while getopts ":achp:v" opt; do
+  shift $((OPTIND-1))
   case $opt in
-  a) ASN_ONLY=true;;
+  a)
+    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [ $# -ge 1 ]; then
+      ACTION=asn2ip
+    else
+      short; exit 1
+    fi
+    LASTOPT=$opt
+    ;;
+  c)
+    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [ $# -ge 1 ]; then
+      ACTION=cc2asn
+    else
+      short; exit 1
+    fi
+    LASTOPT=$opt
+    ;;
   h)
-    usage
-    exit 0
+    if [ $# -eq 0 ]; then
+      usage
+      exit 0
+    else
+      short; exit 1
+    fi
     ;;
   p)
-    if grep -Ev '^[0-9]+$' &>/dev/null <<<"$OPTARG"; then
-      echo "Option -$opt expects an integer as argument" >&2
-      exit 1
+    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [ $# -ge 1 ]; then
+      if grep -Ev '^[0-9]+$' &>/dev/null <<<"$OPTARG"; then
+        short; exit 1
+      fi
+      MAX=$((10#$OPTARG))
+    else
+      short; exit 1
     fi
-    MAX=$((10#$OPTARG))
+    LASTOPT=$opt
     ;;
   v)
-    echo "$PROG $VERSION"
-    echo "Written by $AUTHOR"
-    exit 0
+    if [ $# -eq 0 ]; then
+      echo "$PROG $VERSION"
+      echo "Written by $AUTHOR"
+      exit 0
+    else
+      short; exit 1
+    fi
     ;;
   :)
-    echo "Option -$OPTARG requires an argument" >&2
-    exit 1
+    die "-$OPTARG requires an argument"
     ;;
   \?)
-    echo "Invalid option: -$OPTARG" >&2
-    exit 1
+    short; exit 1
     ;;
   esac
 done;
-shift $((OPTIND-1))
 
 # main
-input=$1
-
-if $ASN_ONLY; then
-  validate_asn $input; if [ $? -eq 1 ]; then exit 1; fi
-  asn2ip $input
-else
-  validate_cc $input; if [ $? -eq 1 ]; then exit 1; fi
-
-  # GNU parallel installed?
-  if which parallel &>/dev/null; then
-    PARALLEL="parallel -j+${MAX:=64}"
-  fi
-
-  cc2asn $input | asn2ip
+# is GNU parallel installed?
+if which parallel123 &>/dev/null; then
+  PARALLEL="parallel -j+${MAX:=64}"
 fi
+
+for i in $*; do $ACTION $i; done
