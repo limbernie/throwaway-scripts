@@ -68,12 +68,12 @@ asn2ip() {
   local server=whois.radb.net
 
   if [[ -z "$asn" || "$asn" == "-" ]]; then
-    cat $asn
+    cat -
   else
     cat <<<"$asn"
-  fi | $PARALLEL whois -h $server "$command{}" 2>/dev/null | \
+  fi | ($PARALLEL whois -h $server "$command{}" 2>/dev/null | \
       grep -Ev '^[a-zA-Z]' | tr -d '\n' | sed -r 's/(\/[0-9]{1,2})/\1\n/g' | \
-        sed '/^$/d' | tr -d ' ' | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
+        sed '/^$/d' | tr -d ' ') | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
           uniq -c | awk '{ print $NF }'
 }
 
@@ -81,13 +81,13 @@ asn2ip() {
 cc2asn() {
   local cc=$(tr 'a-z' 'A-Z' <<<$1); validate_cc $cc
   local ua="Mozilla/5.0"
-  local url="http://bgp.he.net/country/$cc"
+  local url="http://bgp.he.net/country"
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cat $asn
+    cat -
   else
-    cat <<<"$asn"
-  fi | curl -s -A $ua $url | grep -Eo 'AS[0-9]+' | uniq -c | awk '{ print $NF }'
+    cat <<<"$cc"
+  fi | ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+') | uniq -c | awk '{ print $NF }'
 }
 
 # return IP from CC
@@ -95,7 +95,7 @@ cc2ip() {
   local cc=$1; validate_cc $cc
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cc2asn $cc | asn2ip
+    cc2asn | asn2ip
   else
     cc2asn <<<"$cc" | asn2ip
   fi
@@ -105,13 +105,8 @@ cc2ip() {
 validate_asn() {
   local asn=$1
 
-  # sanity check
-  if [ -z "$asn" ]; then
-    die "argument is missing: [ASN]"
-  fi
-
   # format check
-  if grep -Ev '^(-|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
+  if grep -Ev '^(-?|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
     die "invalid ASN format"
   fi
 }
@@ -120,13 +115,8 @@ validate_asn() {
 validate_cc() {
   local cc=$1
 
-  # sanity check
-  if [ -z "$cc" ]; then
-    die "argument is missing: [CC]"
-  fi
-
   # format check
-  if grep -Ev '^[a-zA-Z]{2}$' <<<"$cc" >/dev/null; then
+  if grep -Ev '^(-?|[a-zA-Z]{2})$' <<<"$cc" >/dev/null; then
     die "invalid country code"
   fi
 }
@@ -200,8 +190,12 @@ done;
 
 # main
 # is GNU parallel installed?
-if which parallel123 &>/dev/null; then
+if which parallel &>/dev/null; then
   PARALLEL="parallel -j+${MAX:=64}"
 fi
 
-for i in $*; do $ACTION $i; done
+if [[ -z "$1" || "$1" == "-" ]]; then
+  $ACTION -
+else
+  for i in $*; do $ACTION $i; done
+fi
