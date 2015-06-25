@@ -77,6 +77,11 @@ asn2ip() {
           sed '/^$/d' | tr -d ' ' | \
             sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
               uniq -c | awk '{ print $NF }'
+
+# awk to the rescue againg
+# time cat ASN.txt | \
+#   xargs -n1 -P64 -I{} whois -h whois.radb.net '!g{}' 2>/dev/null | \
+#     awk 'BEGIN { RS="(A[0-9]+|[CD])"} { for (i=1; i <=NF; i++) print $i
 }
 
 # return ASN from CC
@@ -89,8 +94,9 @@ cc2asn() {
     cat -
   else
     cat <<<"$cc"
-  fi | $PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' | \
-          uniq -c | awk '{ print $NF }' | tr -d 'AS' | sort -n | sed 's/^/AS/'
+  fi | ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) | \
+          uniq -c | awk '{ print $NF }' | \
+            tr -d 'AS' | sort -n | sed 's/^/AS/'
 }
 
 # return IP from CC
