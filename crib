@@ -73,7 +73,7 @@ asn2ip() {
     cat <<<"$asn"
   fi | ($PARALLEL whois -h $server "$command{}" 2>/dev/null | \
       grep -Ev '^[a-zA-Z]' | tr -d '\n' | sed -r 's/(\/[0-9]{1,2})/\1\n/g' | \
-        sed '/^$/d' | tr -d ' ') | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
+        sed '/^$/d' | tr -d ' ' &) | sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | \
           uniq -c | awk '{ print $NF }'
 }
 
@@ -87,7 +87,8 @@ cc2asn() {
     cat -
   else
     cat <<<"$cc"
-  fi | ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+') | uniq -c | awk '{ print $NF }'
+  fi | ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) | \
+          uniq -c | awk '{ print $NF }' | tr -d 'AS' | sort -n | sed 's/^/AS/'
 }
 
 # return IP from CC
