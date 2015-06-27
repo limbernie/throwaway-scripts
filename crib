@@ -54,6 +54,9 @@ They are 2-letter country codes used widely to represent
 countries, dependent territories and special areas of
 geographical interest.
 
+When CC is -, read standard input. This can be useful if you
+$(echo -ne ${b}cat${o})(1) a list of country codes to $PROG for bulk operations.
+
 $(echo -e ${b}Examples${o})
   $PROG SG          # Print Singapore's IP blocks (fast)
   $PROG US          # Print United States' IP blocks (long)
