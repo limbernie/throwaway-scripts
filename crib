@@ -10,9 +10,6 @@ PROG=$(basename $0)
 # default: CC to IP blocks
 ACTION=cc2ip
 
-# release the kraken!
-PARALLEL="xargs -n1 -P${MAX:=64} -I{}"
-
 # fanciful output
 b="\033[1m"  # bold
 u="\033[4m"  # underline
@@ -60,7 +57,7 @@ $(echo -ne ${b}cat${o})(1) a list of country codes to $PROG for bulk operations.
 $(echo -e ${b}Examples${o})
   $PROG SG          # Print Singapore's IP blocks (fast)
   $PROG US          # Print United States' IP blocks (long)
-  $PROG -p 100 SG   # Same as above but run 100 processes in parallel
+  $PROG -p 100 SG   # Same but run 100 processes in parallel
   $PROG -a AS668    # Print IP blocks originating from AS668
   $PROG -c SG       # Print ASNs originating from SG
 
@@ -204,6 +201,9 @@ while getopts ":achp:v" opt; do
 done;
 
 # main
+# release the kraken!
+PARALLEL="xargs -n1 -P${MAX:=64} -I{}"
+
 if [[ -z "$1" || "$1" == "-" ]]; then
   $ACTION -
 else
