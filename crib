@@ -1,5 +1,5 @@
 #!/bin/bash -
-# Print a country's IP blocks in CIDR notation to standard output
+# Print a country's IPv4 prefixes in CIDR notation to standard output
 # Version 3.0
 # Written by Bernard Lim <bernard.lim@sands.com>
 
@@ -49,7 +49,8 @@ $(echo -e ${b}Options${o})
 $PROG uses ISO 3166-1 alpha-2 codes to represent country.
 They are 2-letter country codes used widely to represent
 countries, dependent territories and special areas of
-geographical interest.
+geographical interest. Examples: SG for Singapore or
+US for United States.
 
 When CC is -, read standard input. This can be useful if you
 $(echo -ne ${b}cat${o})(1) a list of country codes to $PROG for bulk operations.
@@ -80,11 +81,15 @@ asn2ip() {
   $PARALLEL sh -c 'whois -h whois.radb.net !g{} > /tmp/{}.xargs' 2>/dev/null
 
   # awk to the rescue again
-  cat /tmp/*.xargs | awk '\
+  cat /tmp/*.xargs |
+  awk '\
     BEGIN { RS = "(A[0-9]+|[CD])\n?"; FS = " "; }
-          { for (i = 1; i <= NF; i++) print $i  }' | \
-    tr -d "\n" | sed -r 's/(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))/\1\n/g' | \
-      sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 | uniq -c | awk '{ print $NF }'
+          { for (i = 1; i <= NF; i++) print $i  }' |
+  tr -d "\n" |
+  sed -r 's/(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))/\1\n/g' |
+  sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 |
+  uniq -c |
+  awk '{ print $NF }'
 }
 
 # return ASN from CC
@@ -97,9 +102,13 @@ cc2asn() {
     cat -
   else
     cat <<<"$cc"
-  fi | ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) | \
-          uniq -c | awk '{ print $NF }' | \
-            tr -d 'AS' | sort -n | sed 's/^/AS/'
+  fi |
+  ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) |
+  uniq -c |
+  awk '{ print $NF }' |
+  tr -d 'AS' |
+  sort -n |
+  sed 's/^/AS/'
 }
 
 # return IP from CC
