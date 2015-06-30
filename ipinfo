@@ -5,7 +5,7 @@
 
 AUTHOR="Bernard Lim <lim.yiok.kia@gmail.com>"
 PROG=$(basename $0)
-VER="3.0"
+VERSION="3.0"
 
 HTTP="http://"
 SOCKS="socks4://"
@@ -16,7 +16,7 @@ PROXY_OPTION=
 MAX_FIELDS=11
 
 # public DNS servers
-# slow, non-responsive DNS servers are commented out
+# non-responsive DNS servers are commented out
 DNS_HOST="pcsupport.about.com"
 DNS_PATH="/od/tipstricks/a/free-public-dns-servers.htm"
 DNS_SOURCE="${HTTP}${DNS_HOST}${DNS_PATH}"
@@ -52,10 +52,10 @@ DNS_SERVERS=( \
 74.82.42.42 \
 109.69.8.51 )
 
-# dependency error message
-depends() {
-  echo "$PROG: dependency command \`$1' not found" >&2
-  return 1
+# graceful death!
+die() {
+  echo "$PROG: $*" >&2
+  exit 1
 }
 
 # fanciful output
@@ -63,11 +63,17 @@ b="\033[1m"
 off="\033[0m"
 ul="\033[4m"
 
+# shorter usage
+short() {
+  usage | sed '2q'
+  echo "See \`$PROG -h' for more information"
+}
+
 # usage message
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION...] [IPv4_ADDRESS]
-Print extra information about IPv4_ADDRESS to standard output
+Usage: $PROG [OPTION...] [ADDRESS]
+Print extra information about ADDRESS to standard output
 
 $(echo -e ${b}Output${off})
 ipaddr|ptr;...|pdns;...|cc|state|city|zip|lat|lon|asn|isp
@@ -75,8 +81,8 @@ ipaddr|ptr;...|pdns;...|cc|state|city|zip|lat|lon|asn|isp
 where "|" is field separator
 
 $(echo -e ${b}Fields${off})
-  1) ipaddr       IPv4_ADDRESS in quad-dotted notation
-  2) ptr          PTR record
+  1) ipaddr       IPv4 address in quad-dotted notation
+  2) ptr          PTR record from reverse DNS lookup
   3) pdns         Passive DNS
   4) cc           Two-letter country code
   5) state        Two-letter state code
@@ -139,7 +145,7 @@ proxify() {
       return 1
     fi
   else
-    depends "curl"
+    die "depends on \`curl'"
   fi
 }
 
@@ -154,10 +160,11 @@ proxify_type() {
   PROXY_SOURCE="${PROXY_HOST}${PROXY_PATH}${PROXY_LIST}"
 
   get_proxies() {
-    for ((p=0; p<3; p++)); do
-      (curl -m5 -s -A $USER_AGENT "${PROXY_SOURCE}$p" &)
-    done | grep -Eo 'host=[0-9.]+&port=[0-9]+' | \
-      sed -e 's/\&port=/:/' -e 's/host=//'
+    for ((page=0; page<3; page++)); do
+      (curl -m5 -s -A $USER_AGENT "${PROXY_SOURCE}$page" &)
+    done |
+    grep -Eo 'host=[0-9.]+&port=[0-9]+' |
+    sed -e 's/\&port=/:/' -e 's/host=//'
   }
 
   if which curl &>/dev/null; then
@@ -170,7 +177,7 @@ proxify_type() {
       return 1
     fi
   else
-    depends "curl"
+    die "depends on \`curl'"
   fi
 }
 
@@ -183,15 +190,17 @@ parse() {
   local nr=$(awk -F"," '{ print NF }' <<<"$1")
 
   if [ ${#ranges[@]} -lt $nr ]; then
-    echo "$PROG: fields are numbered from 1" >&2
-    return 1
+    die "fields are numbered from 1"
   fi
 
   for range in ${ranges[@]}; do
     expansion=$(expand $range ${limit:=50})
     if [ -z "$expansion" ]; then return 1; fi
     echo "$expansion"
-  done | tr ' ' '\n' | tr ' ' '\n' | sort -un | tr '\n' ' '
+  done |
+  tr ' ' '\n' |
+  sort -un |
+  tr '\n' ' '
 }
 
 # expand ranges of the form N, N-, N-M, -N
@@ -201,13 +210,11 @@ expand() {
   local max=$2
 
   if [ -z "$input" ]; then
-    echo "$PROG: fields are numbered from 1" >&2
-    return 1
+    die "fields are numbered from 1"
   fi
 
   if grep -Eo '^-$' <<<"$input" &>/dev/null; then
-    echo "$PROG: invalid range with no endpoint: $input" >&2
-    return 1
+    die "invalid range with no endpoint: $input"
   fi
 
   # N
@@ -215,13 +222,11 @@ expand() {
     let value="$input"
     let nd="$(echo -n $value | wc -c)"
     if [ $nd -ge 19 ]; then
-      echo "$PROG: field number \`$input' is too large" >&2
-      return 1
+      die "field number \`$input' is too large"
     fi
 
     if [ $value -eq 0 ]; then
-      echo "$PROG: fields are numbered from 1" >&2
-      return 1
+      die "fields are numbered from 1"
     fi
 
     echo $value
@@ -232,13 +237,11 @@ expand() {
     let value="$lo"
     let nd="$(echo -n $value | wc -c)"
     if [ $nd -ge 19 ]; then
-      echo "$PROG: field number \`$lo' is too large" >&2
-      return 1
+      die "field number \`$lo' is too large"
     fi
 
     if [ $value -eq 0 ]; then
-      echo "$PROG: fields are numbered from 1" >&2
-      return 1
+      die "fields are numbered from 1"
     fi
 
     seq $lo $max
@@ -249,34 +252,31 @@ expand() {
     let value="$lo"
     let nd="$(echo -n $value | wc -c)"
     if [ $nd -ge 19 ]; then
-      echo "$PROG: field number \`$lo' is too large" >&2
-      return 1
+      die "field number \`$lo' is too large"
     fi
 
     if [ $value -eq 0 ]; then
-      echo "$PROG: fields are numbered from 1" >&2
-      return 1
+      die "fields are numbered from 1"
     fi
 
     hi="${input#*-}"
     let value="$hi"
     let nd="$(echo -n $value | wc -c)"
     if [ $nd -ge 19 ]; then
-      echo "$PROG: field number \`$hi' is too large" >&2
-      return 1
+      die "field number \`$hi' is too large"
     fi
 
     if [ $value -eq 0 ]; then
-      echo "$PROG: fields are numbered from 1" >&2
-      return 1
+      die "fields are numbered from 1"
     fi
 
     if (( $lo > $hi )); then
-      echo "$PROG: invalid decreasing range" >&2
-      return 1
+      die "invalid decreasing range"
     fi
 
-    if (( $hi > $max )); then hi=$max; fi
+    if (( $hi > $max )); then
+      hi=$max
+    fi
 
     seq $lo $hi
 
@@ -286,23 +286,22 @@ expand() {
     let value="$hi"
     let nd="$(echo -n $value | wc -c)"
     if [ $nd -ge 19 ]; then
-      echo "$PROG: field number \`$hi' is too large" >&2
-      return 1
+      die "field number \`$hi' is too large"
     fi
 
     if [ $value -eq 0 ]; then
-      echo "$PROG: fields are numbered from 1" >&2
-      return 1
+      die "fields are numbered from 1"
     fi
 
-    if (( $hi > $max )); then hi=$max; fi
+    if (( $hi > $max )); then
+      hi=$max
+    fi
 
     seq $hi
 
   # No man's land
   else
-    echo "$PROG: invalid field list" >&2
-    return 1
+    die "invalid field list"
   fi
 }
 
@@ -314,12 +313,14 @@ dnslookup() {
     local A=$(host -W1 -s $1 $DNS_OPTION | grep "$dnp" || echo "(NXDOMAIN)")
     local B=$(awk '{ print $NF }' <<<"$A")
     if [ $(tr -cd '.' <<<"$B" | wc -c) -ne 1 ]; then
-      sed -r 's/\.?$//' <<<"$B" | tr '\n' ';' | sed 's/;$//'
+      sed -r 's/\.?$//' <<<"$B" |
+      tr '\n' ';' |
+      sed 's/;$//'
     else
       echo "(NULL)"
     fi
   else
-    depends "host"
+    die "depends on \`host'"
   fi
 }
 
@@ -368,7 +369,7 @@ geoip() {
 
     echo "$ccy|$stt|$cty|$zip|$lat|$lon"
   else
-    depends "curl"
+    die "depends on \`curl'"
   fi
 }
 
@@ -385,7 +386,7 @@ ip2asn() {
       name=${name%,*}
       echo "$asn|$name" )
   else
-    depends "whois"
+    die "depends on \`whois'"
   fi
 }
 
@@ -429,7 +430,7 @@ psvlookup() {
         tr '\n' ';' | sed 's/;$//')
     if [ -z "$PSV" ]; then echo "N/A"; else echo "$PSV"; fi
   else
-    depends "curl"
+    die "depends on \`curl'"
   fi
 }
 
@@ -449,19 +450,16 @@ stitch() {
 validate() {
   # sanity check
   if [ -z "$1" ]; then
-    echo "$PROG: argument is missing: [IPv4_ADDRESS]" >&2
-    return 1
+    die "argument is missing: [ADDRESS]"
   else
     # quad dotted format check
     if grep -E -v '^([0-9]+\.){3}[0-9]+$' <<<"$1" &>/dev/null; then
-      echo "$PROG: argument \`$1' is not an IPv4 address" >&2
-      return 1
+      die "argument \`$1' is not a valid IPv4 address"
     else
       # ip value check
       (IFS=. read a b c d <<<"$1"
         if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
-          echo "$PROG: argument \`$1' is not an IPv4 address" >&2
-          return 1
+          die "argument \`$1' is not a valid IPv4 address"
         fi
       )
     fi
@@ -470,64 +468,69 @@ validate() {
 
 # check for empty arguments
 if [ $# -eq 0 ]; then
-  usage
-  exit 1
+  short; exit 1
 fi
 
 # parse short options
 OPTIND=1
 while getopts ":df:hl:pv" opt; do
+  shift $((OPTIND-1))
   case $opt in
     d)
-      if [ $# -eq 1 ]; then validate; fi
-      if [ $? -eq 1 ]; then exit 1; fi
-
-      DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
-      DNS_OPTION="$DNS_SERVER"
+      if [ $# -eq 0 ]; then
+        DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
+        DNS_OPTION="$DNS_SERVER"
+      else
+        short; exit 1;
+      fi
       ;;
     f)
       if [[ "$LASTOPT" == "$opt" ]]; then
-        echo "$PROG: only one \`-$opt' may be specified" >&2
-        exit 1
+        die "only one \`-$opt' may be specified"
       fi
 
       # validate ranges
       if grep -E -v '^[0-9,-]+$' <<<"$OPTARG" &>/dev/null; then
-        echo "$PROG: invalid field list: $OPTARG" >&2
-        exit 1
+        die "invalid field list: $OPTARG"
       fi
 
       FIELD=$OPTARG
       LASTOPT=$opt
       ;;
     h)
-      usage
-      exit 0
+      if [ $# -eq 0 ]; then
+        usage
+        exit 0
+      else
+        short; exit 1
+      fi
       ;;
     l)
-      case $OPTARG in
-        d)
-          echo "# Public DNS servers"
-          echo "# $DNS_SOURCE"
-          tr ' ' '\n' <<<"${DNS_SERVERS[@]}"
-          exit 0
-          ;;
-        p)
-          if proxify_type &>/dev/null; then
-            echo "# Open proxies"
-            echo "# ${HTTP}${PROXY_HOST}"
-            tr ' ' '\n' <<<"${PROXY_SERVERS[@]}"
+      if [ $# -eq 0 ]; then
+        case $OPTARG in
+          d)
+            echo "# Public DNS servers"
+            echo "# $DNS_SOURCE"
+            tr ' ' '\n' <<<"${DNS_SERVERS[@]}"
             exit 0
-          else
-            echo "$PROXY_HOST (connection timeout)" >&2
-            exit 1
-          fi
-          ;;
-        *)
-          echo "$PROG: invalid option argument: $OPTARG" >&2
-          exit 1
-          ;;
-      esac
+            ;;
+          p)
+            if proxify_type &>/dev/null; then
+              echo "# Open proxies"
+              echo "# ${HTTP}${PROXY_HOST}"
+              tr ' ' '\n' <<<"${PROXY_SERVERS[@]}"
+              exit 0
+            else
+              die "$PROXY_HOST (connection timeout)"
+            fi
+            ;;
+          *)
+            short; exit 1
+            ;;
+        esac
+      else
+        short; exit 1
+      fi
       ;;
     p)
       if [ $# -eq 1 ]; then validate; fi
@@ -546,33 +549,31 @@ while getopts ":df:hl:pv" opt; do
       fi
       ;;
     v)
-      echo "$PROG $VER"
-      echo "Written by $AUTHOR"
-      exit 0
+      if [ $# -eq 0 ]; then
+      		echo "$PROG $VERSION"
+      		echo "Written by $AUTHOR"
+      		exit 0
+      else
+          short; exit 1
+      fi
       ;;
     :)
-      echo "$PROG: option \`-$OPTARG' requires an argument" >&2
-      exit 1
+      die "option \`-$OPTARG' requires an argument"
       ;;
     \?)
-      echo "$PROG: invalid option: -$OPTARG" >&2
-      exit 1
+      die "invalid option: -$OPTARG"
       ;;
   esac
 done
-shift $((OPTIND-1))  # no more options
 
 # main
-input=$1
-
-validate "$input"
-if [ $? -eq 1 ]; then exit 1; fi
+input=$1; validate "$input"
 
 if [ -z "$FIELD" ]; then
-  DNS=$(dnslookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
-  BGP=$(psvlookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
-  GEO=$(geolookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
-  ASN=$(asnlookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
+  DNS=$(dnslookup "$input")
+  BGP=$(psvlookup "$input")
+  GEO=$(geolookup "$input")
+  ASN=$(asnlookup "$input")
 
   stitch "$input"
 else
@@ -587,34 +588,32 @@ else
   TWO=$(printf "N/A|%0.s" {1..2})
   SIX=$(printf "N/A|%0.s" {1..6})
 
-  if [ "$DNS" = "on" ]; then
+  if [[ "$DNS" == "on" ]]; then
     DNS=$(dnslookup "$input")
-    if [ $? -eq 1 ]; then exit 1; fi
   else
     DNS="N/A"
   fi
 
-  if [ "$BGP" = "on" ]; then
+  if [[ "$BGP" == "on" ]]; then
     BGP=$(psvlookup "$input")
-    if [ $? -eq 1 ]; then exit 1; fi
   else
     BGP="N/A"
   fi
 
-  if [ "$GEO" = "on" ]; then
+  if [[ "$GEO" == "on" ]]; then
     GEO=$(geolookup "$input")
-    if [ $? -eq 1 ]; then exit 1; fi
   else
     GEO="${SIX%|}"
   fi
 
-  if [ "$ASN" = "on" ]; then
+  if [[ "$ASN" == "on" ]]; then
     ASN=$(asnlookup "$input")
-    if [ $? -eq 1 ]; then exit 1; fi
   else
     ASN="${TWO%|}"
   fi
 
-  stitch "$input" | cut -d"|" -f"$FIELD" 2>/dev/null | sed '/^$/d'
+  stitch "$input" |
+  cut -d"|" -f"$FIELD" 2>/dev/null |
+  sed '/^$/d'
 
 fi
