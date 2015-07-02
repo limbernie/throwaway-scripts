@@ -72,7 +72,7 @@ short() {
 # usage message
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION...] [ADDRESS]
+Usage: $PROG [OPTION]... [ADDRESS]...
 Print extra information about ADDRESS to standard output
 
 $(echo -e ${b}Output${o})
@@ -532,68 +532,68 @@ done
 shift $((OPTIND - 1))
 
 # main
-input=$1; validate "$input"
+for i in $*; do
+  input=$i; validate "$input"
 
-if [ -n "$PROXY" ]; then
-  PROXY=$(proxify)
+  if [ -n "$PROXY" ]; then
+    PROXY=$(proxify)
 
-  if [ -z "$PROXY" ]; then
-    PROXY_OPTION=
-  elif [ "$PROXY" = ":" ]; then
-    PROXY_OPTION=
-  elif [ "${PROXY#*:}" -eq 1080 ]; then
-    PROXY_OPTION="-x ${SOCKS}${PROXY}"
-  else
-    PROXY_OPTION="-x ${HTTP}${PROXY}"
+    if [ -z "$PROXY" ]; then
+      PROXY_OPTION=
+    elif [ "$PROXY" = ":" ]; then
+      PROXY_OPTION=
+    elif [ "${PROXY#*:}" -eq 1080 ]; then
+      PROXY_OPTION="-x ${SOCKS}${PROXY}"
+    else
+      PROXY_OPTION="-x ${HTTP}${PROXY}"
+    fi
   fi
-fi
 
-if [ -z "$FIELD" ]; then
-  DNS=$(dnslookup "$input")
-  BGP=$(psvlookup "$input")
-  GEO=$(geolookup "$input")
-  ASN=$(asnlookup "$input")
-
-  stitch "$input"
-else
-  SET=($(parse "$FIELD" "$MAX_FIELDS"))
-
-  # if field is in set; turn on
-  if grep -E '\b2\b' <<<"${SET[*]}" &>/dev/null; then DNS="on"; fi
-  if grep -E '\b3\b' <<<"${SET[*]}" &>/dev/null; then BGP="on"; fi
-  if grep -E '\b[4-9]\b' <<<"${SET[*]}" &>/dev/null; then GEO="on"; fi
-  if grep -E '\b(10|11)\b' <<<"${SET[*]}" &>/dev/null; then ASN="on"; fi
-
-  TWO=$(printf "N/A|%0.s" {1..2})
-  SIX=$(printf "N/A|%0.s" {1..6})
-
-  if [[ "$DNS" == "on" ]]; then
+  if [ -z "$FIELD" ]; then
     DNS=$(dnslookup "$input")
-  else
-    DNS="N/A"
-  fi
-
-  if [[ "$BGP" == "on" ]]; then
     BGP=$(psvlookup "$input")
-  else
-    BGP="N/A"
-  fi
-
-  if [[ "$GEO" == "on" ]]; then
     GEO=$(geolookup "$input")
-  else
-    GEO="${SIX%|}"
-  fi
-
-  if [[ "$ASN" == "on" ]]; then
     ASN=$(asnlookup "$input")
+
+    stitch "$input"
   else
-    ASN="${TWO%|}"
+    SET=($(parse "$FIELD" "$MAX_FIELDS"))
+
+    # if field is in set; turn on
+    if grep -E '\b2\b' <<<"${SET[*]}" &>/dev/null; then DNS="on"; fi
+    if grep -E '\b3\b' <<<"${SET[*]}" &>/dev/null; then BGP="on"; fi
+    if grep -E '\b[4-9]\b' <<<"${SET[*]}" &>/dev/null; then GEO="on"; fi
+    if grep -E '\b(10|11)\b' <<<"${SET[*]}" &>/dev/null; then ASN="on"; fi
+
+    TWO=$(printf "N/A|%0.s" {1..2})
+    SIX=$(printf "N/A|%0.s" {1..6})
+
+    if [[ "$DNS" == "on" ]]; then
+      DNS=$(dnslookup "$input")
+    else
+      DNS="N/A"
+    fi
+
+    if [[ "$BGP" == "on" ]]; then
+      BGP=$(psvlookup "$input")
+    else
+      BGP="N/A"
+    fi
+
+    if [[ "$GEO" == "on" ]]; then
+      GEO=$(geolookup "$input")
+    else
+      GEO="${SIX%|}"
+    fi
+
+    if [[ "$ASN" == "on" ]]; then
+      ASN=$(asnlookup "$input")
+    else
+      ASN="${TWO%|}"
+    fi
+
+    stitch "$input" |
+    cut -d"|" -f"$FIELD" 2>/dev/null |
+    sed '/^$/d'
   fi
-
-  stitch "$input" |
-  cut -d"|" -f"$FIELD" 2>/dev/null |
-  sed '/^$/d'
-
-fi
-
+done;
