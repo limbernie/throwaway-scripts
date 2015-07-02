@@ -509,6 +509,7 @@ while getopts ":df:hl:pv" opt; do
       esac
       ;;
     p)
+      if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
       PROXY="on"
       LASTOPT=$opt
