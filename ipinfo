@@ -461,11 +461,13 @@ while getopts ":df:hl:pv" opt; do
     d)
       if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+
       DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
       DNS_OPTION="$DNS_SERVER"
       LASTOPT=$opt
       ;;
     f)
+      if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
 
       # validate ranges
@@ -512,6 +514,7 @@ while getopts ":df:hl:pv" opt; do
     p)
       if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+
       PROXY="on"
       LASTOPT=$opt
       ;;
