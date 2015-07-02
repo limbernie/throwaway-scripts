@@ -52,7 +52,7 @@ DNS_SERVERS=( \
 74.82.42.42 \
 109.69.8.51 )
 
-# graceful death!
+# die a graceful death!
 die() {
   echo "$PROG: $*" >&2
   exit 1
@@ -60,7 +60,7 @@ die() {
 
 # fanciful output
 b="\033[1m"
-off="\033[0m"
+o="\033[0m"
 ul="\033[4m"
 
 # shorter usage
@@ -75,12 +75,12 @@ cat <<EOF
 Usage: $PROG [OPTION...] [ADDRESS]
 Print extra information about ADDRESS to standard output
 
-$(echo -e ${b}Output${off})
+$(echo -e ${b}Output${o})
 ipaddr|ptr;...|pdns;...|cc|state|city|zip|lat|lon|asn|isp
 
 where "|" is field separator
 
-$(echo -e ${b}Fields${off})
+$(echo -e ${b}Fields${o})
   1) ipaddr       IPv4 address in quad-dotted notation
   2) ptr          PTR record from reverse DNS lookup
   3) pdns         Passive DNS
@@ -93,7 +93,7 @@ $(echo -e ${b}Fields${off})
  10) asn          Autonomous System (AS) number
  11) isp          AS Operator or previously ISP
 
-$(echo -e ${b}Options${off})
+$(echo -e ${b}Options${o})
   -d              Use random public domain name server
                   to perform reverse DNS lookup
   -f LIST         Select only these fields. Like \`cut'
@@ -114,7 +114,7 @@ Each range is one of:
   N-M             from N'th to M'th (included) field
   -M              from first to M'th (included) field
 
-$(echo -e ${b}Examples${off})
+$(echo -e ${b}Examples${o})
   $PROG 8.8.8.8          # Use default settings and print all fields
   $PROG -l(d|p)          # List available domain name servers or open proxies
   $PROG -d 8.8.8.8       # Use random domain name server and print all fields
@@ -127,32 +127,10 @@ useful but without any warranty. It is provided “as is”.
 EOF
 }
 
-# proxify - return random open proxy from xroxy.com
-# timeout in 5 seconds
-proxify() {
-  PROXY_HOST="www.xroxy.com"
-  PROXY_PATH="/proxylist.js"
-  PROXY_SOURCE="${PROXY_HOST}${PROXY_PATH}"
-
-  if which curl &>/dev/null; then
-    PROXY_SERVERS=($(curl -m5 -s -A $USER_AGENT $PROXY_SOURCE | \
-      sed -r 's/.*\[(.*)\].*/\1/' | tr -d '"' | tr ',' ' '))
-    if [ ${#PROXY_SERVERS[@]} -gt 0 ]; then
-      PROXY_SERVER=${PROXY_SERVERS[$RANDOM % ${#PROXY_SERVERS[@]}]}
-      echo "$PROXY_SERVER"
-    else
-      PROXY_SERVER=
-      return 1
-    fi
-  else
-    die "depends on \`curl'"
-  fi
-}
-
-# proxify_type - return random proxy from xroxy.com
+# proxify - return random proxy from xroxy.com
 # timeout in 5 seconds
 # type = Anonymous, 1atency < 1ms, reliability > 90%
-proxify_type() {
+proxify() {
   PROXY_HOST="www.xroxy.com"
   PROXY_TYPE="Anonymous"
   PROXY_LIST="type=${PROXY_TYPE}&latency=1000&reliability=9000&desc=true&pnum="
@@ -329,9 +307,12 @@ retrieve() {
   local json=$1
   local key=$2
   local value=$(grep -Eo "\"$key\":.*,?" <<<"$json" | \
-    cut -d"," -f1 | cut -d":" -f2 | tr -d '"' | \
-      sed -r 's/^\s?\{?//' | sed -r 's/\s?\}?$//')
-  if [ -z "$value" ]; then echo "N/A"; else echo "$value"; fi
+    cut -d"," -f1 | \
+    cut -d":" -f2 | \
+    tr -d '"' | \
+    sed -r 's/^\s?\{?//' | \
+    sed -r 's/\s?\}?$//')
+  [ -z "$value" ] && echo "N/A" || echo "$value"
 }
 
 # web scraper for GeoIP
@@ -426,8 +407,10 @@ psvlookup() {
   if which curl &>/dev/null; then
     local url="bgp.he.net/ip/$1#_dns"
     PSV=$(curl -m10 -s -A $USER_AGENT $PROXY_OPTION "$url" | \
-      sed 's/>, </>\n</g' | sed -nr 's/^\s*<a href="\/dns.*>(.*)<\/a>/\1/p' | \
-        tr '\n' ';' | sed 's/;$//')
+      sed 's/>, </>\n</g' | \
+      sed -nr 's/^\s*<a href="\/dns.*>(.*)<\/a>/\1/p' | \
+      tr '\n' ';' | \
+      sed 's/;$//')
     if [ -z "$PSV" ]; then echo "N/A"; else echo "$PSV"; fi
   else
     die "depends on \`curl'"
@@ -474,69 +457,64 @@ fi
 # parse short options
 OPTIND=1
 while getopts ":df:hl:pv" opt; do
-  shift $((OPTIND-1))
   case $opt in
     d)
-      if [ $# -eq 0 ]; then
-        DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
-        DNS_OPTION="$DNS_SERVER"
-      else
-        short; exit 1;
-      fi
+      if [ $# -ne 1 ]; then short; exit 1; fi
+      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
+
+      if [ -z "$2" ]; then die "argument is mssing: [ADDRESS]"; fi
+      DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
+      DNS_OPTION="$DNS_SERVER"
       ;;
     f)
-      if [[ "$LASTOPT" == "$opt" ]]; then
-        die "only one \`-$opt' may be specified"
-      fi
+      if [ $OPTIND -ne 2 ]; then short; exit 1; fi
 
       # validate ranges
       if grep -E -v '^[0-9,-]+$' <<<"$OPTARG" &>/dev/null; then
-        die "invalid field list: $OPTARG"
+        short; exit 1
       fi
 
       FIELD=$OPTARG
-      LASTOPT=$opt
       ;;
     h)
-      if [ $# -eq 0 ]; then
-        usage
-        exit 0
-      else
-        short; exit 1
-      fi
+      if [ $# -ne 1 ]; then short; exit 1; fi
+      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
+
+      usage
+      exit 0
       ;;
     l)
-      if [ $# -eq 0 ]; then
-        case $OPTARG in
-          d)
-            echo "# Public DNS servers"
-            echo "# $DNS_SOURCE"
-            tr ' ' '\n' <<<"${DNS_SERVERS[@]}"
+      if [ $# -ne 1 ]; then short; exit 1; fi
+
+      # validate option argument
+      case $OPTARG in
+        d)
+          echo "# Public DNS servers"
+          echo "# $DNS_SOURCE"
+          tr ' ' '\n' <<<"${DNS_SERVERS[@]}"
+          exit 0
+          ;;
+        p)
+          if proxify &>/dev/null; then
+            echo "# Open proxies"
+            echo "# ${HTTP}${PROXY_HOST}"
+            tr ' ' '\n' <<<"${PROXY_SERVERS[@]}"
             exit 0
-            ;;
-          p)
-            if proxify_type &>/dev/null; then
-              echo "# Open proxies"
-              echo "# ${HTTP}${PROXY_HOST}"
-              tr ' ' '\n' <<<"${PROXY_SERVERS[@]}"
-              exit 0
-            else
-              die "$PROXY_HOST (connection timeout)"
-            fi
-            ;;
-          *)
-            short; exit 1
-            ;;
-        esac
-      else
-        short; exit 1
-      fi
+          else
+            die "$PROXY_HOST (connection timeout)"
+          fi
+          ;;
+        *)
+          short; exit 1
+          ;;
+      esac
       ;;
     p)
-      if [ $# -eq 1 ]; then validate; fi
-      if [ $? -eq 1 ]; then exit 1; fi
+      if [ $# -ne 1 ]; then short; exit 1; fi
+      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
 
-      PROXY=$(proxify_type)
+      if [ -z "$2" ]; then die "argument is mssing: [ADDRESS]"; fi
+      PROXY=$(proxify)
 
       if [ -z "$PROXY" ]; then
         PROXY_OPTION=
@@ -549,13 +527,12 @@ while getopts ":df:hl:pv" opt; do
       fi
       ;;
     v)
-      if [ $# -eq 0 ]; then
-      		echo "$PROG $VERSION"
-      		echo "Written by $AUTHOR"
-      		exit 0
-      else
-          short; exit 1
-      fi
+      if [ $# -ne 1 ]; then short; exit 1; fi
+      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
+
+      echo "$PROG $VERSION"
+      echo "Written by $AUTHOR"
+      exit 0
       ;;
     :)
       die "option \`-$OPTARG' requires an argument"
@@ -565,6 +542,7 @@ while getopts ":df:hl:pv" opt; do
       ;;
   esac
 done
+shift $((OPTIND - 1))
 
 # main
 input=$1; validate "$input"
