@@ -72,7 +72,7 @@ short() {
 # usage message
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION]... [ADDRESS]...
+Usage: $PROG [OPTION...] [ADDRESS]...
 Print extra information about ADDRESS to standard output
 
 $(echo -e ${b}Output${o})
