@@ -459,15 +459,13 @@ OPTIND=1
 while getopts ":df:hl:pv" opt; do
   case $opt in
     d)
-      if [ $# -ne 1 ]; then short; exit 1; fi
-      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
-
-      if [ -z "$2" ]; then die "argument is mssing: [ADDRESS]"; fi
+      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
       DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
       DNS_OPTION="$DNS_SERVER"
+      LASTOPT=$opt
       ;;
     f)
-      if [ $OPTIND -ne 2 ]; then short; exit 1; fi
+      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
 
       # validate ranges
       if grep -E -v '^[0-9,-]+$' <<<"$OPTARG" &>/dev/null; then
@@ -475,6 +473,7 @@ while getopts ":df:hl:pv" opt; do
       fi
 
       FIELD=$OPTARG
+      LASTOPT=$opt
       ;;
     h)
       if [ $# -ne 1 ]; then short; exit 1; fi
@@ -510,21 +509,9 @@ while getopts ":df:hl:pv" opt; do
       esac
       ;;
     p)
-      if [ $# -ne 1 ]; then short; exit 1; fi
-      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
-
-      if [ -z "$2" ]; then die "argument is mssing: [ADDRESS]"; fi
-      PROXY=$(proxify)
-
-      if [ -z "$PROXY" ]; then
-        PROXY_OPTION=
-      elif [ "$PROXY" = ":" ]; then
-        PROXY_OPTION=
-      elif [ "${PROXY#*:}" -eq 1080 ]; then
-        PROXY_OPTION="-x ${SOCKS}${PROXY}"
-      else
-        PROXY_OPTION="-x ${HTTP}${PROXY}"
-      fi
+      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+      PROXY="on"
+      LASTOPT=$opt
       ;;
     v)
       if [ $# -ne 1 ]; then short; exit 1; fi
@@ -546,6 +533,20 @@ shift $((OPTIND - 1))
 
 # main
 input=$1; validate "$input"
+
+if [ -n "$PROXY" ]; then
+  PROXY=$(proxify)
+
+  if [ -z "$PROXY" ]; then
+    PROXY_OPTION=
+  elif [ "$PROXY" = ":" ]; then
+    PROXY_OPTION=
+  elif [ "${PROXY#*:}" -eq 1080 ]; then
+    PROXY_OPTION="-x ${SOCKS}${PROXY}"
+  else
+    PROXY_OPTION="-x ${HTTP}${PROXY}"
+  fi
+fi
 
 if [ -z "$FIELD" ]; then
   DNS=$(dnslookup "$input")
@@ -595,3 +596,4 @@ else
   sed '/^$/d'
 
 fi
+
