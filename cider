@@ -15,7 +15,7 @@ b="\033[1m"  # bold
 u="\033[4m"  # underline
 o="\033[0m"  # off
 
-# graceful death!
+# die a graceful death!
 die() {
   echo "$PROG: $*" >&2
   exit 1
@@ -24,7 +24,7 @@ die() {
 # shorter usage
 short() {
   usage | sed 2q
-  echo "See \`$PROG -h' for more information"
+  echo "Try \`$PROG -h' for more information"
 }
 
 # usage

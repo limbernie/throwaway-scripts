@@ -55,25 +55,26 @@ DNS_SERVERS=( \
 # die a graceful death!
 die() {
   echo "$PROG: $*" >&2
+  echo "Try \`$PROG -h' for more information." >&2
   exit 1
 }
 
 # fanciful output
-b="\033[1m"
-o="\033[0m"
-ul="\033[4m"
+b="\033[1m"  # bold
+u="\033[4m"  # underline
+o="\033[0m"  # off
 
 # shorter usage
 short() {
   usage | sed '2q'
-  echo "See \`$PROG -h' for more information"
+  echo "Try \`$PROG -h' for more information."
 }
 
 # usage message
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION...] [ADDRESS]...
-Print extra information about ADDRESS to standard output
+Usage: $PROG [OPTION]... [ADDRESS]...
+Print extra information about ADDRESS to standard output.
 
 $(echo -e ${b}Output${o})
 ipaddr|ptr;...|pdns;...|cc|state|city|zip|lat|lon|asn|isp
@@ -433,33 +434,28 @@ stitch() {
 validate() {
   # sanity check
   if [ -z "$1" ]; then
-    die "argument is missing: [ADDRESS]"
+    die "missing argument: [ADDRESS]"
   else
     # quad dotted format check
     if grep -E -v '^([0-9]+\.){3}[0-9]+$' <<<"$1" &>/dev/null; then
-      die "argument \`$1' is not a valid IPv4 address"
+      die "invalid IPv4 address: $1"
     else
       # ip value check
-      (IFS=. read a b c d <<<"$1"
-        if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
-          die "argument \`$1' is not a valid IPv4 address"
-        fi
-      )
+      OLD_IFS=$IFS
+      IFS=. read a b c d <<<"$1"
+      if (( $a > 255 || $b > 255 || $c > 255 || $d > 255 )); then
+        die "invalid IPv4 address: $1"
+      fi
+      IFS=$OLD_IFS
     fi
   fi
 }
-
-# check for empty arguments
-if [ $# -eq 0 ]; then
-  short; exit 1
-fi
 
 # parse short options
 OPTIND=1
 while getopts ":df:hl:pv" opt; do
   case $opt in
     d)
-      if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
 
       DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
@@ -467,20 +463,18 @@ while getopts ":df:hl:pv" opt; do
       LASTOPT=$opt
       ;;
     f)
-      if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
 
       # validate ranges
       if grep -E -v '^[0-9,-]+$' <<<"$OPTARG" &>/dev/null; then
-        short; exit 1
+        die "invalid field list"
       fi
 
       FIELD=$OPTARG
       LASTOPT=$opt
       ;;
     h)
-      if [ $# -ne 1 ]; then short; exit 1; fi
-      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
+      if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
 
       usage
       exit 0
@@ -507,20 +501,18 @@ while getopts ":df:hl:pv" opt; do
           fi
           ;;
         *)
-          short; exit 1
+          die "invalid option argument"
           ;;
       esac
       ;;
     p)
-      if [ $# -eq 1 ]; then short; exit 1; fi
       if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
 
       PROXY="on"
       LASTOPT=$opt
       ;;
     v)
-      if [ $# -ne 1 ]; then short; exit 1; fi
-      if [ $OPTIND -eq 1 ]; then short; exit 1; fi
+      if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
 
       echo "$PROG $VERSION"
       echo "Written by $AUTHOR"
@@ -530,11 +522,16 @@ while getopts ":df:hl:pv" opt; do
       die "option \`-$OPTARG' requires an argument"
       ;;
     \?)
-      die "invalid option: -$OPTARG"
+      die "invalid option -- '$OPTARG'"
       ;;
   esac
 done
 shift $((OPTIND - 1))
+
+# check for empty arguments
+if [ $# -eq 0 ]; then
+  short; exit 1
+fi
 
 # main
 for i in $*; do
@@ -601,4 +598,4 @@ for i in $*; do
     cut -d"|" -f"$FIELD" 2>/dev/null |
     sed '/^$/d'
   fi
-done;
+done

@@ -21,23 +21,24 @@ clean() {
 }
 trap "clean" EXIT
 
-# graceful death!
+# die a graceful death!
 die() {
   echo "$PROG: $*" >&2
+  echo "Try \`$PROG -h' for more information" >&2
   exit 1
 }
 
 # shorter usage
 short() {
   usage | sed 2q
-  echo "See \`$PROG -h' for more information"
+  echo "Try \`$PROG -h' for more information"
 }
 
 # usage
 usage() {
 cat <<EOF
-Usage: $PROG [OPTION] [CC]... (2-letter country code)
-Print CC's IPv4 prefixes in CIDR notation to standard output
+Usage: $PROG [OPTION]... [CC]... (2-letter country code)
+Print CC's IPv4 prefixes in CIDR notation to standard output.
 
 $(echo -e ${b}Options${o})
   -a            Print ASN's IPv4 prefixes and exit
@@ -57,7 +58,7 @@ $(echo -ne ${b}cat${o})(1) a list of country codes to $PROG for bulk operations.
 
 $(echo -e ${b}Examples${o})
   $PROG SG          # Print Singapore's IPv4 prefixes (fast)
-  $PROG US          # Print United States' IPv4 prefixes (long)
+  $PROG US          # Print United States' IPv4 prefixes (slow)
   $PROG -p 100 SG   # Same but run 100 processes in parallel
   $PROG -a AS668    # Print IPv4 prefixes originating from AS668
   $PROG -c SG       # Print ASNs originating from SG
@@ -68,7 +69,7 @@ useful but without any warranty. It is provided "as is".
 EOF
 }
 
-# return IP prefixes from ASN
+# ASN to IP prefixes
 asn2ip() {
   local asn=$1
   validate_asn $asn
@@ -92,7 +93,7 @@ asn2ip() {
   awk '{ print $NF }'
 }
 
-# return ASN from CC
+# CC to ASN
 cc2asn() {
   local cc=$(tr 'a-z' 'A-Z' <<<"$1"); validate_cc $cc
   local ua="Mozilla/5.0"
@@ -111,7 +112,7 @@ cc2asn() {
   sed 's/^/AS/'
 }
 
-# return IP from CC
+# CC to IP prefixes
 cc2ip() {
   local cc=$(tr 'a-z' 'A-Z' <<<"$1")
   validate_cc $cc
@@ -127,9 +128,14 @@ cc2ip() {
 validate_asn() {
   local asn=$1
 
-  # format check
-  if grep -Ev '^(-?|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
-    die "invalid ASN format"
+  # sanity check
+  if [ -z "$asn" ]; then
+    die "missing argument: [ASN]"
+  else
+    # format check
+    if grep -Ev '^(-?|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
+      die "invalid ASN format"
+    fi
   fi
 }
 
@@ -137,78 +143,64 @@ validate_asn() {
 validate_cc() {
   local cc=$1
 
-  # format check
-  if grep -Ev '^(-?|[a-zA-Z]{2})$' <<<"$cc" >/dev/null; then
-    die "invalid country code"
+  if [ -z "$cc" ]; then
+    die "missing argument: [CC]"
+  else
+    # format check
+    if grep -Ev '^(-?|[a-zA-Z]{2})$' <<<"$cc" >/dev/null; then
+      die "invalid country code"
+    fi
   fi
 }
 
-# Check for empty arguments
-if [ $# -eq 0 ]; then
-  short
-  exit 1
-fi
-
-# Parse short options
+# parse short options
 OPTIND=1
 while getopts ":achp:v" opt; do
-  shift $((OPTIND-1))
   case $opt in
   a)
     if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
-    if [ $# -ge 1 ]; then
-      ACTION=asn2ip
-    else
-      short; exit 1
-    fi
+    ACTION=asn2ip
     LASTOPT=$opt
     ;;
   c)
     if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
-    if [ $# -ge 1 ]; then
-      ACTION=cc2asn
-    else
-      short; exit 1
-    fi
+    ACTION=cc2asn
     LASTOPT=$opt
     ;;
   h)
-    if [ $# -eq 0 ]; then
-      usage
-      exit 0
-    else
-      short; exit 1
-    fi
+    if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
+    usage
+    exit 0
     ;;
   p)
     if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
-    if [ $# -ge 1 ]; then
-      if grep -Ev '^[0-9]+$' &>/dev/null <<<"$OPTARG"; then
+
+    # validate option argument
+    if grep -Ev '^[0-9]+$' &>/dev/null <<<"$OPTARG"; then
         short; exit 1
-      fi
-      MAX=$((10#$OPTARG))
-    else
-      short; exit 1
     fi
+
+    MAX=$((10#$OPTARG))
     LASTOPT=$opt
     ;;
   v)
-    if [ $# -eq 0 ]; then
-      echo "$PROG $VERSION"
-      echo "Written by $AUTHOR"
-      exit 0
-    else
-      short; exit 1
-    fi
+    if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
+    echo "$PROG $VERSION"
+    echo "Written by $AUTHOR"
+    exit 0
     ;;
   :)
     die "-$OPTARG requires an argument"
     ;;
   \?)
-    short; exit 1
+    die "invalid option: -- '$OPTARG'"
     ;;
   esac
 done;
+shift $((OPTIND-1))
+
+# check for empty arguments
+if [ $# -eq 0 ]; then short; exit 1; fi
 
 # main
 # release the kraken!
