@@ -18,6 +18,7 @@ o="\033[0m"  # off
 # die a graceful death!
 die() {
   echo "$PROG: $*" >&2
+  echo "Try \`$PROG -h' for more information" >&2
   exit 1
 }
 
@@ -158,6 +159,7 @@ _awk() {
     function die(err)
     {
       print prog ": " err > "/dev/stderr"
+      print "Try `" prog " -h\47 for more information." > "/dev/stderr"
       next
     }
     function validate_cidr(a)
@@ -209,58 +211,71 @@ _awk() {
 # parse short options
 OPTIND=1
 while getopts ":c:ehv" opt; do
-  shift $((OPTIND-1))
   case $opt in
     c)
-      if [ $# -ge 1 ]; then
-        case $OPTARG in
-          1) ACTION=quad2num;;
-          2) ACTION=num2quad;;
-          3) ACTION=quad2hex;;
-          4) ACTION=hex2quad;;
-          5) ACTION=bit2addr;;
-          6) ACTION=addr2bit;;
-          *) die "invalid option argument: $OPTARG";;
-        esac
-      else
-        short
-        exit 1
+      if [[ "$LASTOPT" == "$opt" ]]; then
+        die "only one \`-$opt' may be specified"
       fi
+
+      case $OPTARG in
+        1) ACTION=quad2num;;
+        2) ACTION=num2quad;;
+        3) ACTION=quad2hex;;
+        4) ACTION=hex2quad;;
+        5) ACTION=bit2addr;;
+        6) ACTION=addr2bit;;
+        *) die "invalid option argument -- '$OPTARG'";;
+      esac
+      LASTOPT=$opt; LASTOPTARG=$OPTARG
       ;;
     e)
-      if [ $# -ge 1 ]; then
-        ACTION=expand_cidr
-      else
-        short
-        exit 1
+      if [[ "$LASTOPT" == "$opt" ]]; then
+        die "only one \`-$opt' may be specified"
       fi
+
+      ACTION=expand_cidr
+      LASTOPT=$opt
       ;;
     h)
-      if [ $# -eq 0 ]; then
-        usage; exit 0
-      else
-        short; exit 1
-      fi
+      if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
+      usage; exit 0
       ;;
     v)
-      if [ $# -eq 0 ]; then
-        echo "$PROG $VERSION"
-        echo "Written by $AUTHOR"
-        exit 0
-      else
-        short; exit 1
-      fi
+      if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
+      echo "$PROG $VERSION"
+      echo "Written by $AUTHOR"
+      exit 0
       ;;
-   \?) die "invalid option: -$OPTARG";;
+    :) die "option requires an argument -- '$OPTARG'";;
+   \?) die "invalid option -- '$OPTARG'";;
   esac
 done
+shift $((OPTIND-1))
 
-# main
-if [ $# -eq 0 ]; then
-  # empty arguments
+# check for empty arguments
+if [[ -n "$LASTOPT" && $# -eq 0 ]]; then
+  case $LASTOPT in
+    c)
+       case $LASTOPTARG in
+         1) die "missing argument: [ADDRESS]";;
+         2) die "missing argument: [ADDRESS]";;
+         3) die "missing argument: [ADDRESS]";;
+         4) die "missing argument: [ADDRESS]";;
+         5) die "missing argument: [NETMASK]";;
+         6) die "missing argument: [NETMASK]";;
+         *) short; exit 1;;
+       esac
+       ;;
+    e) die "missing argument: [ADDRESS]";;
+    *) short; exit 1;;
+  esac
+elif [ $# -eq 0 ]; then
   short
   exit 1
-elif [[ "$1" == "-" ]]; then
+fi
+
+# main
+if [[ "$1" == "-" ]]; then
   # read from stdin
   _awk $ACTION -
 else

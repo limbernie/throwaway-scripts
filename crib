@@ -77,7 +77,7 @@ asn2ip() {
   if [[ -z "$asn" || "$asn" == "-" ]]; then
     cat -
   else
-    cat <<<"$asn"
+    cat - <<<"$asn"
   fi | \
   $PARALLEL sh -c 'whois -h whois.radb.net !g{} > /tmp/{}.xargs' 2>/dev/null
 
@@ -102,7 +102,7 @@ cc2asn() {
   if [[ -z "$cc" || "$cc" == "-" ]]; then
     cat -
   else
-    cat <<<"$cc"
+    cat - <<<"$cc"
   fi |
   ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) |
   uniq -c |
@@ -118,9 +118,9 @@ cc2ip() {
   validate_cc $cc
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cc2asn | asn2ip
+    cc2asn - | asn2ip -
   else
-    cc2asn <<<"$cc" | asn2ip
+    cc2asn - <<<"$cc" | asn2ip -
   fi
 }
 
@@ -134,7 +134,7 @@ validate_asn() {
   else
     # format check
     if grep -Ev '^(-?|[aA][sS][0-9]+)$' <<<"$asn" > /dev/null; then
-      die "invalid ASN format"
+      die "invalid ASN"
     fi
   fi
 }
@@ -143,6 +143,7 @@ validate_asn() {
 validate_cc() {
   local cc=$1
 
+  # sanity check
   if [ -z "$cc" ]; then
     die "missing argument: [CC]"
   else
@@ -158,12 +159,18 @@ OPTIND=1
 while getopts ":achp:v" opt; do
   case $opt in
   a)
-    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [[ "$LASTOPT" == "$opt" ]]; then
+      die "only one \`-$opt' may be specified"
+    fi
+
     ACTION=asn2ip
     LASTOPT=$opt
     ;;
   c)
-    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [[ "$LASTOPT" == "$opt" ]]; then
+      die "only one \`$opt' may be specified"
+    fi
+
     ACTION=cc2asn
     LASTOPT=$opt
     ;;
@@ -173,11 +180,14 @@ while getopts ":achp:v" opt; do
     exit 0
     ;;
   p)
-    if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+    if [[ "$LASTOPT" == "$opt" ]]; then
+      die "only one \`$opt' may be specified"
+    fi
 
     # validate option argument
     if grep -Ev '^[0-9]+$' &>/dev/null <<<"$OPTARG"; then
-        short; exit 1
+      die "invalid option argument -- '$OPTARG'"
+      exit 1
     fi
 
     MAX=$((10#$OPTARG))
@@ -190,17 +200,26 @@ while getopts ":achp:v" opt; do
     exit 0
     ;;
   :)
-    die "-$OPTARG requires an argument"
+    die "option requires an argument -- '$OPTARG'"
     ;;
   \?)
-    die "invalid option: -- '$OPTARG'"
+    die "invalid option -- '$OPTARG'"
     ;;
   esac
 done;
 shift $((OPTIND-1))
 
 # check for empty arguments
-if [ $# -eq 0 ]; then short; exit 1; fi
+if [[ -n "$LASTOPT" && $# -eq 0 ]]; then
+  case $LASTOPT in
+    a) validate_asn; exit 1;;
+    c) validate_cc; exit 1;;
+    *) short; exit 1;;
+  esac
+elif [ $# -eq 0 ]; then
+  short
+  exit 1
+fi
 
 # main
 # release the kraken!

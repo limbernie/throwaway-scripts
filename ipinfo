@@ -456,18 +456,22 @@ OPTIND=1
 while getopts ":df:hl:pv" opt; do
   case $opt in
     d)
-      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+      if [[ "$LASTOPT" == "$opt" ]]; then
+        die "only one \`-$opt' may be specified"
+      fi
 
       DNS_SERVER=${DNS_SERVERS[$RANDOM % ${#DNS_SERVERS[@]}]}
       DNS_OPTION="$DNS_SERVER"
       LASTOPT=$opt
       ;;
     f)
-      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+      if [[ "$LASTOPT" == "$opt" ]]; then
+        die "only one \`-$opt' may be specified"
+      fi
 
       # validate ranges
       if grep -E -v '^[0-9,-]+$' <<<"$OPTARG" &>/dev/null; then
-        die "invalid field list"
+        die "invalid field list -- '$OPTARG'"
       fi
 
       FIELD=$OPTARG
@@ -501,12 +505,14 @@ while getopts ":df:hl:pv" opt; do
           fi
           ;;
         *)
-          die "invalid option argument"
+          die "invalid option argument -- '$OPTARG'"
           ;;
       esac
       ;;
     p)
-      if [[ "$LASTOPT" == "$opt" ]]; then short; exit 1; fi
+      if [[ "$LASTOPT" == "$opt" ]]; then
+        die "only one \`-$opt' may be specified"
+      fi
 
       PROXY="on"
       LASTOPT=$opt
@@ -519,7 +525,7 @@ while getopts ":df:hl:pv" opt; do
       exit 0
       ;;
     :)
-      die "option \`-$OPTARG' requires an argument"
+      die "option requires an argument -- '$OPTARG'"
       ;;
     \?)
       die "invalid option -- '$OPTARG'"
@@ -529,7 +535,9 @@ done
 shift $((OPTIND - 1))
 
 # check for empty arguments
-if [ $# -eq 0 ]; then
+if [[ -n "$LASTOPT" && $# -eq 0 ]]; then
+  validate; exit 1
+elif [ $# -eq 0 ]; then
   short; exit 1
 fi
 
