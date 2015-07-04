@@ -200,7 +200,7 @@ expand() {
   if grep -Eo '^[0-9]+$' <<<"$input" &>/dev/null; then
     let value="$input"
     let nd="$(echo -n $value | wc -c)"
-    if [ $nd -ge 19 ]; then
+    if [ $nd -ge 5 ]; then
       die "field number \`$input' is too large"
     fi
 
@@ -215,7 +215,7 @@ expand() {
     lo="${input%-}"
     let value="$lo"
     let nd="$(echo -n $value | wc -c)"
-    if [ $nd -ge 19 ]; then
+    if [ $nd -ge 5 ]; then
       die "field number \`$lo' is too large"
     fi
 
@@ -230,7 +230,7 @@ expand() {
     lo="${input%-*}"
     let value="$lo"
     let nd="$(echo -n $value | wc -c)"
-    if [ $nd -ge 19 ]; then
+    if [ $nd -ge 5 ]; then
       die "field number \`$lo' is too large"
     fi
 
@@ -241,7 +241,7 @@ expand() {
     hi="${input#*-}"
     let value="$hi"
     let nd="$(echo -n $value | wc -c)"
-    if [ $nd -ge 19 ]; then
+    if [ $nd -ge 5 ]; then
       die "field number \`$hi' is too large"
     fi
 
@@ -264,7 +264,7 @@ expand() {
     hi="${input#-}"
     let value="$hi"
     let nd="$(echo -n $value | wc -c)"
-    if [ $nd -ge 19 ]; then
+    if [ $nd -ge 5 ]; then
       die "field number \`$hi' is too large"
     fi
 
