@@ -32,7 +32,7 @@ short() {
 usage() {
 cat<<EOF
 Usage: $PROG [OPTION] [ADDRESS]...
-Expand and print ADDRESS in CIDR notation to standard output
+Expand and print ADDRESS in CIDR notation to standard output.
 
 $(echo -e ${b}Options${o})
   -c TYPE       Quick conversion for TYPE
