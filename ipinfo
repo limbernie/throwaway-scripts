@@ -79,7 +79,7 @@ Print extra information about ADDRESS to standard output.
 $(echo -e ${b}Output${o})
 ipaddr|ptr;...|pdns;...|cc|state|city|zip|lat|lon|asn|isp
 
-where "|" is field separator
+    where "|" is the field separator.
 
 $(echo -e ${b}Fields${o})
   1) ipaddr       IPv4 address in quad-dotted notation
