@@ -1,0 +1,18 @@
+Install
+=======
+
+  To install the scripts, run:
+  $ sudo ./install.sh
+
+  If you are already `root', run:
+  # ./install.sh
+
+Uninstall
+=========
+
+  To uninstall the scripts, run:
+  $ sudo ./uninstall.sh
+ 
+  If you are already `root', run:
+  # ./uninstall.sh
+
