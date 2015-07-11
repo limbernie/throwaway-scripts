@@ -136,7 +136,7 @@ cc2ip() {
     cc2asn -
   else
     cc2asn - <<<"$cc"
-  fi || exit 1 && (echo "" | asn2ip -)
+  fi || exit 1 | asn2ip -
 }
 
 # validate ASN
