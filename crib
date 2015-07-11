@@ -21,6 +21,13 @@ clean() {
 }
 trap "clean" EXIT
 
+# dependency message
+depends() {
+  echo "$PROG: depends on \`$*'" >&2
+  echo "Install \`$*' and try again." >&2
+  exit 1
+}
+
 # die a graceful death!
 die() {
   echo "$PROG: $*" >&2
@@ -71,45 +78,53 @@ EOF
 
 # ASN to IP prefixes
 asn2ip() {
-  local asn=$1
-  validate_asn $asn
+  if which whois &>/dev/null; then
+    local asn=$1
+    validate_asn $asn
 
-  if [[ -z "$asn" || "$asn" == "-" ]]; then
-    cat -
+    if [[ -z "$asn" || "$asn" == "-" ]]; then
+      cat -
+    else
+      cat - <<<"$asn"
+    fi | \
+    $PARALLEL sh -c 'whois -h whois.radb.net !g{} > /tmp/{}.xargs' 2>/dev/null
+
+    # awk to the rescue again
+    cat /tmp/*.xargs |
+    awk '\
+      BEGIN { RS = "(A[0-9]+|[CD])\n?"; FS = " "; }
+            { for (i = 1; i <= NF; i++) print $i  }' |
+    tr -d "\n" |
+    sed -r 's/(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))/\1\n/g' |
+    sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 |
+    uniq -c |
+    awk '{ print $NF }'
   else
-    cat - <<<"$asn"
-  fi | \
-  $PARALLEL sh -c 'whois -h whois.radb.net !g{} > /tmp/{}.xargs' 2>/dev/null
-
-  # awk to the rescue again
-  cat /tmp/*.xargs |
-  awk '\
-    BEGIN { RS = "(A[0-9]+|[CD])\n?"; FS = " "; }
-          { for (i = 1; i <= NF; i++) print $i  }' |
-  tr -d "\n" |
-  sed -r 's/(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))/\1\n/g' |
-  sort -t. -n -k1,1 -k2,2 -k3,3 -k4,4 |
-  uniq -c |
-  awk '{ print $NF }'
+    depends "whois"
+  fi
 }
 
 # CC to ASN
 cc2asn() {
-  local cc=$(tr 'a-z' 'A-Z' <<<"$1"); validate_cc $cc
-  local ua="Mozilla/5.0"
-  local url="http://bgp.he.net/country"
+  if which curl &>/dev/null; then
+    local cc=$(tr 'a-z' 'A-Z' <<<"$1"); validate_cc $cc
+    local ua="Mozilla/5.0"
+    local url="http://bgp.he.net/country"
 
-  if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cat -
+    if [[ -z "$cc" || "$cc" == "-" ]]; then
+      cat -
+    else
+      cat - <<<"$cc"
+    fi |
+    ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) |
+    uniq -c |
+    awk '{ print $NF }' |
+    tr -d 'AS' |
+    sort -n |
+    sed 's/^/AS/'
   else
-    cat - <<<"$cc"
-  fi |
-  ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) |
-  uniq -c |
-  awk '{ print $NF }' |
-  tr -d 'AS' |
-  sort -n |
-  sed 's/^/AS/'
+    depends "curl"
+  fi
 }
 
 # CC to IP prefixes
