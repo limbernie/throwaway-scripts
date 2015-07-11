@@ -129,19 +129,17 @@ cc2asn() {
 
 # CC to IP prefixes
 cc2ip() {
-  local cc=$(tr 'a-z' 'A-Z' <<<"$1")
-  validate_cc $cc
+  if which curl &>/dev/null; then
+    local cc=$(tr 'a-z' 'A-Z' <<<"$1")
+    validate_cc $cc
 
-  if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cc2asn -
+    if [[ -z "$cc" || "$cc" == "-" ]]; then
+      cc2asn -
+    else
+      cc2asn - <<<"$cc"
+    fi | asn2ip -
   else
-    cc2asn - <<<"$cc"
-  fi || exit 1
-
-  if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cc2asn - | asn2ip -
-  else
-    cc2asn - <<<"$cc" | asn2ip -
+    depends "curl"
   fi
 }
 
