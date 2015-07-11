@@ -133,10 +133,10 @@ cc2ip() {
   validate_cc $cc
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    if cc2asn -; then echo ""; else exit 1; fi | asn2ip -
+    cc2asn -
   else
-    if cc2asn - <<<"$cc"; then echo ""; else exit 1; fi | asn2ip -
-  fi
+    cc2asn - <<<"$cc"
+  fi | asn2ip -
 }
 
 # validate ASN
