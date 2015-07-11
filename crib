@@ -139,10 +139,10 @@ cc2ip() {
   fi || exit 1
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    cc2asn -
+    cc2asn - | asn2ip -
   else
-    cc2asn - <<<"$cc"
-  fi | asn2ip -
+    cc2asn - <<<"$cc" | asn2ip -
+  fi
 }
 
 # validate ASN
