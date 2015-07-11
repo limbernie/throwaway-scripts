@@ -135,7 +135,7 @@ cc2ip() {
   if [[ -z "$cc" || "$cc" == "-" ]]; then
     [ cc2asn - ] && | asn2ip -
   else
-    [ cc2asn - <<<"$cc"] && | asn2ip -
+    [ cc2asn - <<<"$cc" ] && | asn2ip -
   fi
 }
 
