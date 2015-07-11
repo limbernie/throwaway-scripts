@@ -52,6 +52,13 @@ DNS_SERVERS=( \
 74.82.42.42 \
 109.69.8.51 )
 
+# dependency message
+depends() {
+  echo "$PROG: depends on \`$*'" >&2
+  echo "Install \`$*' and try again."
+  exit 1
+}
+
 # die a graceful death!
 die() {
   echo "$PROG: $*" >&2
@@ -156,7 +163,7 @@ proxify() {
       return 1
     fi
   else
-    die "depends on \`curl'"
+    depends "curl"
   fi
 }
 
@@ -299,7 +306,7 @@ dnslookup() {
       echo "(NULL)"
     fi
   else
-    die "depends on \`host'"
+    depends "host"
   fi
 }
 
@@ -351,7 +358,7 @@ geoip() {
 
     echo "$ccy|$stt|$cty|$zip|$lat|$lon"
   else
-    die "depends on \`curl'"
+    depends "curl"
   fi
 }
 
@@ -368,7 +375,7 @@ ip2asn() {
       name=${name%,*}
       echo "$asn|$name" )
   else
-    die "depends on \`whois'"
+    depends "whois"
   fi
 }
 
@@ -414,7 +421,7 @@ psvlookup() {
       sed 's/;$//')
     if [ -z "$PSV" ]; then echo "N/A"; else echo "$PSV"; fi
   else
-    die "depends on \`curl'"
+    depends "curl"
   fi
 }
 
@@ -560,10 +567,10 @@ for i in $*; do
   fi
 
   if [ -z "$FIELD" ]; then
-    DNS=$(dnslookup "$input")
-    BGP=$(psvlookup "$input")
-    GEO=$(geolookup "$input")
-    ASN=$(asnlookup "$input")
+    DNS=$(dnslookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
+    BGP=$(psvlookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
+    GEO=$(geolookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
+    ASN=$(asnlookup "$input"); if [ $? -eq 1 ]; then exit 1; fi
 
     stitch "$input"
   else
@@ -580,24 +587,28 @@ for i in $*; do
 
     if [[ "$DNS" == "on" ]]; then
       DNS=$(dnslookup "$input")
+      if [ $? -eq 1 ]; then exit 1; fi
     else
       DNS="N/A"
     fi
 
     if [[ "$BGP" == "on" ]]; then
       BGP=$(psvlookup "$input")
+      if [ $? -eq 1 ]; then exit 1; fi
     else
       BGP="N/A"
     fi
 
     if [[ "$GEO" == "on" ]]; then
       GEO=$(geolookup "$input")
+      if [ $? -eq 1 ]; then exit 1; fi
     else
       GEO="${SIX%|}"
     fi
 
     if [[ "$ASN" == "on" ]]; then
       ASN=$(asnlookup "$input")
+      if [ $? -eq 1 ]; then exit 1; fi
     else
       ASN="${TWO%|}"
     fi

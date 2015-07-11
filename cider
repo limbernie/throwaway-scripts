@@ -30,7 +30,7 @@ short() {
 
 # usage
 usage() {
-cat<<EOF
+cat <<EOF
 Usage: $PROG [OPTION] [ADDRESS]...
 Expand and print ADDRESS in CIDR notation to standard output.
 

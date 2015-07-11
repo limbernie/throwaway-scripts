@@ -14,6 +14,33 @@ urls=( \
 "ifconfig.me" \
 )
 
+# dependency message
+depends() {
+  echo "$PROG: depends on \`$*'" >&2
+  echo "Install \`$*' and try again." >&2
+  exit 1
+}
+
+# die a graceful death!
+die() {
+  echo "$PROG: $*" >&2
+  exit 1
+}
+
+# shorter usage
+short() {
+  usage | sed '2q'
+  echo "Try \`$PROG -h' for more information."
+}
+
+# usage
+usage() {
+cat <<EOF
+Usage: $PROG N
+Print "what is my IP address?" for every N second(s). Default N is 60s.
+EOF
+}
+
 goodbye() {
   echo -e "  Goodbye!" >&2
   exit 0
@@ -21,18 +48,36 @@ goodbye() {
 trap goodbye INT
 
 wip() {
-	while true; do
-    url=${urls[$RANDOM % ${#urls[@]}]}
-    if  curl -m5 -s $url && printf "%-20s" "$url" >&2; then
-      break
-    fi
-  done | sed 's/br/\n/' | tr -cd '[0-9].\n'
+  if which curl &>/dev/null; then
+	  while true; do
+      url=${urls[$RANDOM % ${#urls[@]}]}
+      if  curl -m5 -s $url && printf "%-20s" "$url" >&2; then
+        break
+      fi
+    done | sed 's/br/\n/' | tr -cd '[0-9].\n'
+  else
+    depends "curl"
+  fi
 }
 
+# parse short options
+OPTIND=1
+while getopts ":h" opt; do
+  case $opt in
+    h)
+      if [[ $# -ne 1 || $OPTIND -eq 1 ]]; then short; exit 1; fi
+      usage
+      exit 0
+      ;;
+   \?) die "invalid option -- '$OPTARG'";;
+  esac
+done
+shift $((OPTIND-1))
+
+# main
 refresh=${1:-60}
 if grep -Ev '^[0-9]+$' <<<"$refresh" >/dev/null; then
-  echo "$PROG: invalid refresh rate" >&2
-  exit 1
+  die "invalid refresh rate"
 fi
 
 if [ $refresh -eq 0 ]; then
