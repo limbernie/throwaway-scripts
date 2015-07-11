@@ -137,7 +137,7 @@ cc2ip() {
   #else
   #  cc2asn - <<<"$cc"
   #fi || exit 1
-  [ cc2asn - <<<"$cc" ] || exit 1
+  [ (cc2asn - <<<"$cc") ] || exit 1
   cc2asb - <<<"$cc" | asn2ip -
 }
 
