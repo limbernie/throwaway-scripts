@@ -132,11 +132,11 @@ cc2ip() {
   local cc=$(tr 'a-z' 'A-Z' <<<"$1")
   validate_cc $cc
 
-  (if [[ -z "$cc" || "$cc" == "-" ]]; then
+  if [[ -z "$cc" || "$cc" == "-" ]]; then
     cc2asn -
   else
     cc2asn - <<<"$cc"
-  fi || exit 1) | asn2ip -
+  fi || exit 1 && (echo "" | asn2ip -)
 }
 
 # validate ASN
