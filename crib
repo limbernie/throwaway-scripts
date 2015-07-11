@@ -132,12 +132,12 @@ cc2ip() {
   local cc=$(tr 'a-z' 'A-Z' <<<"$1")
   validate_cc $cc
 
-  #if [[ -z "$cc" || "$cc" == "-" ]]; then
-  #  cc2asn -
-  #else
-  #  cc2asn - <<<"$cc"
-  #fi || exit 1
-  [ (cc2asn - <<<"$cc") ] || exit 1
+  if [[ -z "$cc" || "$cc" == "-" ]]; then
+    cc2asn -
+  else
+    cc2asn - <<<"$cc"
+  fi || exit 1
+
   cc2asb - <<<"$cc" | asn2ip -
 }
 
