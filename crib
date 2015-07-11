@@ -138,7 +138,11 @@ cc2ip() {
     cc2asn - <<<"$cc"
   fi || exit 1
 
-  cc2asn - <<<"$cc" | asn2ip -
+  if [[ -z "$cc" || "$cc" == "-" ]]; then
+    cc2asn -
+  else
+    cc2asn - <<<"$cc"
+  fi | asn2ip -
 }
 
 # validate ASN
