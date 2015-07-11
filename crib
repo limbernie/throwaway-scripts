@@ -133,9 +133,9 @@ cc2ip() {
   validate_cc $cc
 
   if [[ -z "$cc" || "$cc" == "-" ]]; then
-    if cc2asn -; then echo ""; fi | asn2ip -
+    if cc2asn -; then echo ""; else exit 1; fi | asn2ip -
   else
-    if cc2asn - <<<"$cc"; then echo ""; fi | asn2ip -
+    if cc2asn - <<<"$cc"; then echo ""; else exit 1; fi | asn2ip -
   fi
 }
 
