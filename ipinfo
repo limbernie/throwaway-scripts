@@ -414,7 +414,8 @@ asnlookup() {
 psvlookup() {
   if which curl &>/dev/null; then
     local url="bgp.he.net/ip/$1#_dns"
-    PSV=$(curl -m10 -s -A $USER_AGENT $PROXY_OPTION "$url" | \
+    local nounce="c=BAgiEjEwMS4xMjcuMTQxLjY%3D--ec876d6060bbe6d5703c45043bee315ba31ee196; _bgp_session=BAh7BjoPc2Vzc2lvbl9pZEkiJWYxNDE3Y2U1NGU0YTIzZjRjNWY5MTlkZDIyYjMxNTYwBjoGRUY%3D--50a8d90e501d6a2899907686e7ccf556d52659d1"
+    PSV=$(curl -m10 -s -A $USER_AGENT $PROXY_OPTION -b $nounce "$url" | \
       sed 's/>, </>\n</g' | \
       sed -nr 's/^\s*<a href="\/dns.*>(.*)<\/a>/\1/p' | \
       tr '\n' ';' | \
