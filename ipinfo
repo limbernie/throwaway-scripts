@@ -409,12 +409,29 @@ asnlookup() {
   fi
 }
 
+# what's my ip address?
+wip() {
+  while read url; do
+    if curl -m2 -s $url; then break; fi
+  done <<END_OF_URL | sed 's/br/\n/' | tr -cd '[0-9].\n'
+ifconfig.co
+ifconfig.no
+icanhazip.com
+orga.cat/ip
+my.ip.fi
+api.wipmania.com
+ifconfig.me
+END_OF_URL
+}
+
 # web scraper for passive DNS - bgp.he.net
 # timeout in 10 seconds
 psvlookup() {
   if which curl &>/dev/null; then
     local url="bgp.he.net/ip/$1#_dns"
-    local nounce="c=BAgiEjEwMS4xMjcuMTQxLjY%3D--ec876d6060bbe6d5703c45043bee315ba31ee196; _bgp_session=BAh7BjoPc2Vzc2lvbl9pZEkiJWYxNDE3Y2U1NGU0YTIzZjRjNWY5MTlkZDIyYjMxNTYwBjoGRUY%3D--50a8d90e501d6a2899907686e7ccf556d52659d1"
+    local ip=$(wip)
+    local encode=$(echo -ne '\x04\x08\x22\x12'$ip | base64 | sed 's/=/%3D/')
+    local nounce="c=$encode--ec876d6060bbe6d5703c45043bee315ba31ee196; _bgp_session=BAh7BjoPc2Vzc2lvbl9pZEkiJWYxNDE3Y2U1NGU0YTIzZjRjNWY5MTlkZDIyYjMxNTYwBjoGRUY%3D--50a8d90e501d6a2899907686e7ccf556d52659d1"
     PSV=$(curl -m10 -s -A $USER_AGENT $PROXY_OPTION -b $nounce "$url" | \
       sed 's/>, </>\n</g' | \
       sed -nr 's/^\s*<a href="\/dns.*>(.*)<\/a>/\1/p' | \
