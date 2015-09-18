@@ -416,8 +416,9 @@ nounce() {
     local s=bgp.he.net
     local path=$(curl -s -A $ua -H "Host: $s" -D - $s/ip/$1 | \
       grep -Eo '.*--.*;' | \
-      sed -r 's/.*=(.*);/\1/')
-    local p=$(echo -n $path | md5sum | cut -d' ' -f1)
+      sed -r 's/.*=(.*);/\1/' | \
+      sed 's/%/\/x/g')
+    local p=$(echo -ne $path | md5sum | cut -d' ' -f1)
     local i=$(curl -s -A $ua -H "Host: $s" $s/i | md5sum | cut -d' ' -f1)
 
     # oh yeah!
@@ -440,8 +441,8 @@ nounce() {
 psvlookup() {
   if which curl &>/dev/null; then
     local url="bgp.he.net/ip/$1#_dns"
-    local nounce=$(nounce $1)
-    PSV=$(curl -m10 -s -A $USER_AGENT $PROXY_OPTION -b $nounce "$url" | \
+    n=$(nounce $1)
+    PSV=$(curl -m10 -s -A "$USER_AGENT" "$PROXY_OPTION" -b $n $url | \
       sed 's/>, </>\n</g' | \
       sed -nr 's/^\s*<a href="\/dns.*>(.*)<\/a>/\1/p' | \
       tr '\n' ';' | \
