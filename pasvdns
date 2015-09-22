@@ -1,0 +1,32 @@
+#!/bin/bash -
+# Scrap passivedns.mnemonic.no and print to standard output
+# Version 1.0
+# Written by Bernard Lim <lim.yiok.kia@gmail.com>
+
+PROG=$(basename $0)
+
+UA=Mozilla/5.0
+URL=passivedns.mnemonic.no
+QUERY=$1
+
+usage() {
+  cat <<END
+Usage: $PROG [IPv4 ADDRESS]
+Scrap passivedns.mnemonic.no and print to standard output
+END
+}
+
+if [ $# -eq 0 ]; then
+  usage
+  exit 1
+fi
+
+# oh yeah~!
+curl \
+  -s \
+  -A $UA \
+  -H "Host: $URL" "$URL/search/?query=$QUERY&method=exact" | \
+    grep -E "\s*<td/><a href" | \
+    sed -n '1~2p' | \
+    awk -F'[<>]' '{ print $5 }' | \
+    sed -r 's/\.?$//'
