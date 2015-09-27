@@ -11,7 +11,7 @@ QUERY=$1
 
 usage() {
   cat <<END
-Usage: $PROG [IPv4 ADDRESS]
+Usage: $PROG [ADDRESS]
 Scrap passivedns.mnemonic.no and print to standard output
 END
 }
@@ -25,7 +25,8 @@ fi
 curl \
   -s \
   -A $UA \
-  -H "Host: $URL" "$URL/search/?query=$QUERY&method=exact" | \
+  -H "Host: $URL" \
+  "$URL/search/?query=$QUERY&method=exact" | \
     grep -E "\s*<td/><a href" | \
     sed -n '1~2p' | \
     awk -F'[<>]' '{ print $5 }' | \
