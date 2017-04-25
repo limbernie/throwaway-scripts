@@ -1,6 +1,7 @@
 #!/bin/bash -
 # Print "what is my IP address?" every 60 seconds (default) to standard output
 
+AUTHOR="Bernard Lim"
 PROG=$(basename $0)
 
 urls=( \
