@@ -4,14 +4,15 @@
 PROG=$(basename $0)
 
 urls=( \
-"ifconfig.no" \
-"ifconfig.co" \
 "icanhazip.com" \
-"orga.cat/ip" \
 "my.ip.fi" \
-"www.telize.com/ip" \
 "api.wipmania.com" \
-"ifconfig.me" \
+"wtfismyip.com/text" \
+"ipecho.net/plain" \
+#"ifconfig.co/ip" \
+"ifconfig.io/ip" \
+"ifconfig.sexy/ip" \
+"4.ifcfg.me/ip" \
 )
 
 # dependency message
@@ -49,12 +50,15 @@ trap goodbye INT
 
 wip() {
   if which curl &>/dev/null; then
-	  while true; do
+    while true; do
       url=${urls[$RANDOM % ${#urls[@]}]}
-      if  curl -m5 -s $url && printf "%-20s" "$url" >&2; then
+      ip=$(curl -m5 -s $url)
+      if [ $? -eq 0 ]; then
+        printf "%-20s" "${url%/*}" >&2
+        printf "%s\n" $(tr -cd '[0-9].' <<<"$ip")
         break
       fi
-    done | sed 's/br/\n/' | tr -cd '[0-9].\n'
+    done
   else
     depends "curl"
   fi
