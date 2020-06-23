@@ -7,3 +7,4 @@ A collection of throwaway bash scripts I've written over time. Too wasteful to t
 	ipinfo: Print extra information about IPv4 address to standard output
  	pasvdns: Scrap passivedns.mnemonic.no and print to standard output
 	wimi: Print "what is my IP address?" every 60 seconds (default) to standard output
+    search: Reverse search Chrome Webstore for extension
