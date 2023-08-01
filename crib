@@ -87,7 +87,7 @@ asn2ip() {
     else
       cat - <<<"$asn"
     fi | \
-    $PARALLEL sh -c 'whois -h whois.radb.net !g{} > /tmp/{}.xargs' 2>/dev/null
+    $PARALLEL sh -c 'whois -h whois.radb.net !g"{}" > /tmp/"{}".xargs' 2>/dev/null
 
     # awk to the rescue again
     cat /tmp/*.xargs |
@@ -109,14 +109,14 @@ cc2asn() {
   if which curl &>/dev/null; then
     local cc=$(tr 'a-z' 'A-Z' <<<"$1"); validate_cc $cc
     local ua="Mozilla/5.0"
-    local url="http://bgp.he.net/country"
+    local url="https://bgp.he.net/country"
 
     if [[ -z "$cc" || "$cc" == "-" ]]; then
       cat -
     else
       cat - <<<"$cc"
     fi |
-    ($PARALLEL curl -s -A $ua $url/{} | grep -Eo 'AS[0-9]+' &) |
+    ($PARALLEL curl -sk -A "$ua" "$url/{}" | grep -Eo 'AS[0-9]+' &) |
     uniq -c |
     awk '{ print $NF }' |
     tr -d 'AS' |
@@ -242,7 +242,7 @@ fi
 
 # main
 # release the kraken!
-PARALLEL="xargs -n1 -P${MAX:=64} -I{}"
+PARALLEL="xargs -P${MAX:=64} -I{}"
 
 if [[ -z "$1" || "$1" == "-" ]]; then
   $ACTION -
